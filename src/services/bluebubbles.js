@@ -152,6 +152,10 @@ function attemptForLog(attempt) {
   };
 }
 
+function isCreateChatAttempt(attempt) {
+  return attempt.kind === 'createChat' || attempt.kind === 'addresses';
+}
+
 export function buildBlueBubblesTextAttempts({ phone, chatGuid }, settings = {}) {
   const method = String(settings.bluebubblesSendMethod || 'private-api').trim();
 
@@ -180,24 +184,33 @@ export function buildBlueBubblesTextAttempts({ phone, chatGuid }, settings = {})
   }));
 
   if (parseAddressFallback(settings.bluebubblesAddressFallback)) {
-    attempts.push({
-      index: attempts.length,
-      kind: 'addresses',
-      label: 'addresses',
-      addresses: [normalized],
-      method: ''
-    });
+    for (const service of parseBlueBubblesServiceOrder(settings.bluebubblesServiceOrder)) {
+      attempts.push({
+        index: attempts.length,
+        kind: 'createChat',
+        label: `new ${service} chat`,
+        service,
+        addresses: [normalized],
+        method
+      });
+    }
   }
 
   return attempts;
 }
 
+function blueBubblesTextPath(attempt) {
+  return isCreateChatAttempt(attempt) ? '/chat/new' : '/message/text';
+}
+
 function blueBubblesTextPayload(attempt, message) {
-  if (attempt.kind === 'addresses') {
+  if (isCreateChatAttempt(attempt)) {
     return {
       addresses: attempt.addresses,
       message,
-      tempGuid: `temp-${crypto.randomUUID()}`
+      tempGuid: `temp-${crypto.randomUUID()}`,
+      ...(attempt.service ? { service: attempt.service } : {}),
+      ...(attempt.method ? { method: attempt.method } : {})
     };
   }
 
@@ -209,14 +222,43 @@ function blueBubblesTextPayload(attempt, message) {
   };
 }
 
-function immediateSendError(data) {
-  const errorText = String(data?.error ?? '').trim();
+export function getBlueBubblesSentMessage(result) {
+  const data = result?.data || result || {};
+  if (Array.isArray(data?.messages) && data.messages[0]) return data.messages[0];
+  if (data?.message && typeof data.message === 'object') return data.message;
+  const messageFields = ['isSent', 'isFromMe', 'dateCreated', 'isDelivered', 'dateDelivered', 'error', 'handle'];
+  if (data?.guid && messageFields.some((field) => Object.hasOwn(data, field))) {
+    return data;
+  }
+  return null;
+}
+
+export function getBlueBubblesChatGuid(result, fallback = '') {
+  const data = result?.data || result || {};
+  return (
+    data?.chats?.[0]?.guid ||
+    data?.chat?.guid ||
+    data?.chatGuid ||
+    (Array.isArray(data?.messages) ? data?.guid : '') ||
+    fallback ||
+    ''
+  );
+}
+
+export function getBlueBubblesExternalGuid(result, fallback = '') {
+  return getBlueBubblesSentMessage(result)?.guid || result?.data?.messageGuid || fallback || '';
+}
+
+function immediateSendError(result) {
+  const message = getBlueBubblesSentMessage(result);
+  const errorText = String(message?.error ?? result?.data?.error ?? '').trim();
   return errorText && !['0', 'false', 'null'].includes(errorText.toLowerCase()) ? errorText : '';
 }
 
 export async function sendBlueBubblesTextAttempt({ attempt, message, allAttempts = [], previousErrors = [] }) {
   if (!message?.trim()) throw new Error('Message text is required.');
-  const result = await blueBubblesRequest('/message/text', {
+  const path = blueBubblesTextPath(attempt);
+  const result = await blueBubblesRequest(path, {
     method: 'POST',
     body: JSON.stringify(blueBubblesTextPayload(attempt, message))
   });
@@ -244,7 +286,7 @@ export async function sendBlueBubblesText({ phone, chatGuid, message }) {
         allAttempts: attempts,
         previousErrors: errors
       });
-      const errorCode = immediateSendError(result.data);
+      const errorCode = immediateSendError(result);
       if (!errorCode) return result;
 
       errors.push({

@@ -7,6 +7,9 @@ import { buildInitialFollowup } from './agent.js';
 import {
   buildBlueBubblesTextAttempts,
   getBlueBubblesMessage,
+  getBlueBubblesChatGuid,
+  getBlueBubblesExternalGuid,
+  getBlueBubblesSentMessage,
   sendBlueBubblesText,
   sendBlueBubblesTextAttempt
 } from './bluebubbles.js';
@@ -307,9 +310,13 @@ function messageChatGuid(message) {
   return message?.chats?.[0]?.guid || message?.chat?.guid || message?.chatGuid || '';
 }
 
-function deliveryStateFromBlueBubblesMessage(message, fallbackGuid = '') {
+function sentMessageFromResult(sent) {
+  return getBlueBubblesSentMessage(sent);
+}
+
+function deliveryStateFromBlueBubblesMessage(message, fallbackGuid = '', fallbackChatGuid = '') {
   const externalGuid = message?.guid || fallbackGuid || '';
-  const chatGuid = messageChatGuid(message);
+  const chatGuid = messageChatGuid(message) || fallbackChatGuid || '';
   const errorText = String(message?.error ?? '').trim();
   const hasDeliveryError = errorText && !['0', 'false', 'null'].includes(errorText.toLowerCase());
   const delivered = message?.isDelivered === true || Boolean(message?.dateDelivered);
@@ -550,9 +557,10 @@ async function sendFallbackAttempt(conversation, failedDelivery) {
     allAttempts: attempts,
     previousErrors
   });
-  const chatGuid = sent.data?.chats?.[0]?.guid || sent.data?.chatGuid || sent.data?.chat?.guid || attempt.chatGuid || null;
-  const externalGuid = sent.data?.guid || null;
-  const delivery = deliveryStateFromBlueBubblesMessage(sent.data, externalGuid);
+  const sentMessage = sentMessageFromResult(sent);
+  const chatGuid = getBlueBubblesChatGuid(sent, attempt.chatGuid || null);
+  const externalGuid = getBlueBubblesExternalGuid(sent);
+  const delivery = deliveryStateFromBlueBubblesMessage(sentMessage, externalGuid, chatGuid);
   const raw = {
     ...sent,
     fallbackFromExternalGuid: failedDelivery.externalGuid || conversation.external_guid
@@ -649,9 +657,10 @@ export async function sendInitialFollowup(id) {
       attemptCount: String(attempts.length)
     });
     const sent = await sendBlueBubblesText({ phone: targetPhone, message });
-    const chatGuid = sent.data?.chats?.[0]?.guid || sent.data?.chatGuid || sent.data?.chat?.guid || null;
-    const externalGuid = sent.data?.guid || null;
-    const delivery = deliveryStateFromBlueBubblesMessage(sent.data, externalGuid);
+    const sentMessage = sentMessageFromResult(sent);
+    const chatGuid = getBlueBubblesChatGuid(sent);
+    const externalGuid = getBlueBubblesExternalGuid(sent);
+    const delivery = deliveryStateFromBlueBubblesMessage(sentMessage, externalGuid, chatGuid);
     await withTransaction(async (client) => {
       await client.query(
         `
