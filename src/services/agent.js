@@ -4,9 +4,13 @@ import { errorToLogMeta, truncateText } from '../utils/errors.js';
 
 const concernKeywords = [
   'not fixed',
-  'still',
-  'again',
+  'not working',
+  'not done',
+  'not complete',
+  'not resolved',
   'bad',
+  'terrible',
+  'awful',
   'worse',
   'angry',
   'upset',
@@ -24,10 +28,52 @@ const concernKeywords = [
   'bill',
   'billing',
   'no show',
-  'missed'
+  'missed',
+  'wire',
+  'wires',
+  'cable',
+  'line',
+  'loose',
+  'hanging',
+  'mess',
+  'trash'
 ];
 
-const satisfiedKeywords = ['good', 'great', 'fine', 'satisfied', 'happy', 'thanks', 'thank you', 'all set', 'works'];
+const satisfiedKeywords = [
+  'good',
+  'great',
+  'fine',
+  'satisfied',
+  'happy',
+  'thanks',
+  'thank you',
+  'all set',
+  'works',
+  'no problem',
+  'no issue',
+  'no issues',
+  'nothing else'
+];
+
+const concernPatterns = [
+  /\bnot\s+(fixed|working|done|complete|resolved|happy|satisfied)\b/,
+  /\bstill\s+(not|broken|down|out|loose|hanging|bad|wrong|doesn'?t|isn'?t)\b/,
+  /\b(left|leaving)\b.*\b(wire|wires|cable|line|trash|mess|equipment|box|yard|backyard)\b/,
+  /\b(wire|wires|cable|line|equipment|box)\b.*\b(left|loose|hanging|outside|yard|backyard|damaged|broken)\b/,
+  /\b(damage|damaged|broken|hole|mess|trash|unsafe|dangerous)\b/,
+  /\b(refund|credit|bill|billing|charged|charge)\b/,
+  /\b(manager|supervisor|complaint|complain)\b/,
+  /\b(no show|missed|never came)\b/,
+  /\b(bad|worse|terrible|awful|angry|upset|unhappy)\b/
+];
+
+const satisfiedPatterns = [
+  /\b(no|not any)\s+(problem|problems|issue|issues|concern|concerns)\b/,
+  /\bnothing\s+(else|more|wrong)\b/,
+  /\ball\s+(good|set|fixed|working)\b/,
+  /\beverything\s+(is\s+)?(good|fine|working|works)\b/,
+  /\bworks?\s+(now|great|good|fine)\b/
+];
 
 function renderTemplate(template, job) {
   return String(template || '')
@@ -80,6 +126,126 @@ function normalizeDecision(value) {
     reply: String(value?.reply || '').trim(),
     concernSummary: String(value?.concern_summary || value?.concernSummary || '').trim()
   };
+}
+
+function normalizeText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}' ]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function lastOutboundMessage(conversation = []) {
+  for (let index = conversation.length - 1; index >= 0; index -= 1) {
+    if (conversation[index]?.direction === 'outbound') return conversation[index];
+  }
+  return null;
+}
+
+function asksSatisfactionQuestion(text) {
+  const lower = normalizeText(text);
+  return /\b(satisfied|happy)\b/.test(lower) || /\bhow\s+was\b/.test(lower);
+}
+
+function asksNeedsAttentionQuestion(text) {
+  const lower = normalizeText(text);
+  return (
+    /\bneeds?\s+attention\b/.test(lower) ||
+    /\bstill\s+needs?\b/.test(lower) ||
+    /\banything\b.*\b(attention|wrong|problem|issue|concern)\b/.test(lower) ||
+    /\bwhat\b.*\b(wrong|problem|issue|concern)\b/.test(lower)
+  );
+}
+
+function isShortYes(text) {
+  return /^(yes|yeah|yep|yup|correct|right|there is|there are|it does|they did)\b/.test(normalizeText(text));
+}
+
+function isShortNo(text) {
+  return /^(no|nope|nah|not really|nothing|nothing else)\b/.test(normalizeText(text));
+}
+
+function hasConcernSignal(text) {
+  const lower = normalizeText(text);
+  if (!lower) return false;
+  if (satisfiedPatterns.some((pattern) => pattern.test(lower))) return false;
+  return concernPatterns.some((pattern) => pattern.test(lower)) || concernKeywords.some((word) => lower.includes(word));
+}
+
+function hasSatisfiedSignal(text) {
+  const lower = normalizeText(text);
+  if (!lower) return false;
+  return satisfiedPatterns.some((pattern) => pattern.test(lower)) || satisfiedKeywords.some((word) => lower.includes(word));
+}
+
+function concernDecision(customerText) {
+  return {
+    status: 'concern',
+    reply: 'Thanks for letting us know. I will pass this to a manager so they can follow up with you.',
+    concernSummary: customerText
+  };
+}
+
+function needsIssueDetailsDecision() {
+  return {
+    status: 'needs_followup',
+    reply: "I'm sorry to hear that. What still needs attention from the visit?",
+    concernSummary: ''
+  };
+}
+
+function satisfiedDecision(reply = 'Thanks for confirming. Have a good day.') {
+  return { status: 'satisfied', reply, concernSummary: '' };
+}
+
+export function deterministicDecision({ conversation = [], customerText = '' } = {}) {
+  const lastAgentText = lastOutboundMessage(conversation)?.body || '';
+  const hasDetails = normalizeText(customerText).split(' ').length > 2;
+
+  if (hasConcernSignal(customerText)) return concernDecision(customerText);
+
+  if (asksNeedsAttentionQuestion(lastAgentText)) {
+    if (isShortNo(customerText)) return satisfiedDecision();
+    if (isShortYes(customerText) && !hasDetails) {
+      return {
+        status: 'needs_followup',
+        reply: 'Could you briefly tell me what still needs attention?',
+        concernSummary: ''
+      };
+    }
+    if (isShortYes(customerText) && hasDetails) return concernDecision(customerText);
+  }
+
+  if (asksSatisfactionQuestion(lastAgentText)) {
+    if (isShortNo(customerText)) return needsIssueDetailsDecision();
+    if (isShortYes(customerText) || hasSatisfiedSignal(customerText)) {
+      return satisfiedDecision('Glad to hear it. Thank you for the feedback.');
+    }
+  }
+
+  if (hasSatisfiedSignal(customerText)) return satisfiedDecision('Thank you. We appreciate the feedback.');
+
+  return null;
+}
+
+function preventRepeatedFollowup(decision, conversation = [], customerText = '') {
+  const normalized = normalizeDecision(decision);
+  const lastAgentText = normalizeText(lastOutboundMessage(conversation)?.body || '');
+  const replyText = normalizeText(normalized.reply);
+
+  if (normalized.status === 'concern' && !normalized.reply) {
+    normalized.reply = 'Thanks for letting us know. I will pass this to a manager so they can follow up with you.';
+  }
+  if (normalized.status === 'concern' && !normalized.concernSummary) {
+    normalized.concernSummary = customerText;
+  }
+
+  if (normalized.status === 'needs_followup' && replyText && replyText === lastAgentText) {
+    normalized.reply = 'Could you briefly tell me what still needs attention?';
+  }
+
+  return normalized;
 }
 
 async function callOllama(settings, messages, json = false) {
@@ -143,18 +309,9 @@ async function callModel(settings, messages, json = false) {
 }
 
 function heuristicDecision(customerText) {
-  const lower = String(customerText || '').toLowerCase();
-  if (concernKeywords.some((word) => lower.includes(word))) {
-    return {
-      status: 'concern',
-      reply: 'Thanks for letting us know. I will pass this to a manager so they can follow up with you.',
-      concernSummary: customerText
-    };
-  }
+  if (hasConcernSignal(customerText)) return concernDecision(customerText);
 
-  if (satisfiedKeywords.some((word) => lower.includes(word))) {
-    return { status: 'satisfied', reply: 'Thank you. We appreciate the feedback.', concernSummary: '' };
-  }
+  if (hasSatisfiedSignal(customerText)) return satisfiedDecision('Thank you. We appreciate the feedback.');
 
   return {
     status: 'needs_followup',
@@ -196,6 +353,8 @@ Only ask whether they were satisfied with the service visit.`
 
 export async function classifyCustomerReply({ job, conversation, customerText }) {
   const settings = await getRuntimeSettings();
+  const deterministic = deterministicDecision({ conversation, customerText });
+  if (deterministic) return deterministic;
 
   if (!settings.llmProvider || settings.llmProvider === 'disabled') return heuristicDecision(customerText);
 
@@ -222,12 +381,20 @@ ${transcript}
 Latest customer reply:
 ${customerText}
 
+Classification guardrails:
+- Interpret "yes" and "no" based on the Agent's latest question.
+- If Agent asked whether the customer was satisfied and Customer says "no", status is "needs_followup" and ask what still needs attention.
+- If Agent asked whether anything still needs attention and Customer says "no", status is "satisfied".
+- If Agent asked whether anything still needs attention and Customer says "yes" plus any details, status is "concern".
+- Any unresolved work, damage, loose/hanging/left wires, equipment left behind, billing issue, missed appointment, or manager request is "concern".
+- Never repeat the same Agent question already present in the conversation.
+
 Classify the latest reply. Return strict JSON only.`
         }
       ],
       true
     );
-    return normalizeDecision(extractJsonObject(content));
+    return preventRepeatedFollowup(extractJsonObject(content), conversation, customerText);
   } catch (error) {
     addWorkerLog('agent', 'warn', 'Classification model failed; using heuristic', errorToLogMeta(error, {
       provider: settings.llmProvider,
