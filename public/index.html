@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FTR Fix Bot</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/assets/styles.css?v=20260904-source-poster" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">FTR Fix Bot</p>
+          <h1 id="viewTitle">Jobs</h1>
+        </div>
+        <button class="icon-button" id="refreshBtn" title="Refresh" aria-label="Refresh">Refresh</button>
+      </header>
+
+      <main>
+        <section class="view active" id="jobsView">
+          <div class="filters">
+            <button class="chip active" data-range="today">Today</button>
+            <button class="chip" data-range="yesterday">Yesterday</button>
+            <button class="chip" data-range="lastweek">Last week</button>
+            <button class="chip" data-range="all">All</button>
+            <button class="chip" data-range="custom">Custom</button>
+          </div>
+          <div class="custom-range hidden" id="customRange">
+            <label>From <input type="date" id="fromDate" /></label>
+            <label>To <input type="date" id="toDate" /></label>
+          </div>
+          <form class="upload-row" id="uploadForm">
+            <input type="file" name="image" accept="image/*" />
+            <button type="submit">Upload</button>
+          </form>
+          <div class="job-list" id="jobList"></div>
+        </section>
+
+        <section class="view" id="reviewView">
+          <div class="split">
+            <div class="image-frame">
+              <img id="jobImage" alt="Job screenshot" />
+            </div>
+            <form class="edit-form" id="jobForm">
+              <input type="hidden" id="jobId" />
+              <label>Name <input id="customerName" /></label>
+              <label>Phone <input id="phone" /></label>
+              <label>Account # <input id="accountNumber" /></label>
+              <label>Address <textarea id="address" rows="3"></textarea></label>
+              <div class="button-row">
+                <button type="submit">Save</button>
+                <button type="button" class="secondary" id="reprocessBtn">OCR again</button>
+              </div>
+              <div class="button-row">
+                <button type="button" id="sendFollowupBtn">Send follow-up</button>
+                <button type="button" class="secondary" id="checkDeliveryBtn">Check delivery</button>
+              </div>
+              <button type="button" class="danger-button wide" id="deleteJobBtn">Remove</button>
+              <p class="job-error hidden" id="jobError"></p>
+              <p class="muted" id="jobMeta"></p>
+              <p class="muted poster-meta hidden" id="sourcePosterMeta"></p>
+            </form>
+          </div>
+        </section>
+
+        <section class="view" id="conversationView">
+          <div class="conversation-header" id="conversationHeader"></div>
+          <div class="conversation" id="conversationList"></div>
+        </section>
+
+        <section class="view" id="promptView">
+          <form class="settings-form" id="promptForm">
+            <label>
+              System prompt
+              <textarea id="systemPrompt" rows="14"></textarea>
+            </label>
+            <label>
+              Initial message template
+              <textarea id="initialMessageTemplate" rows="4"></textarea>
+            </label>
+            <button type="submit">Save prompt</button>
+          </form>
+        </section>
+
+        <section class="view" id="settingsView">
+          <section class="settings-form worker-panel">
+            <div class="worker-header">
+              <div>
+                <p class="eyebrow">Telegram Worker</p>
+                <strong id="telegramWorkerState">Loading</strong>
+                <p class="muted" id="telegramWorkerMeta"></p>
+              </div>
+              <span class="status-dot" id="telegramWorkerDot"></span>
+            </div>
+            <div class="button-row">
+              <button type="button" id="startTelegramWorkerBtn">Start worker</button>
+              <button type="button" class="secondary" id="stopTelegramWorkerBtn">Stop worker</button>
+            </div>
+            <button type="button" class="secondary" id="refreshWorkerLogsBtn">Refresh logs</button>
+            <div class="worker-log-list" id="workerLogList"></div>
+          </section>
+          <form class="settings-form" id="settingsForm">
+            <div class="copy-row">
+              <label>App base URL <input id="appBaseUrl" placeholder="https://your-app.example" /></label>
+              <button type="button" class="secondary" id="useCurrentDomainBtn">Use current</button>
+            </div>
+            <label>Telegram job chat title <input id="telegramJobChatTitle" /></label>
+            <label>Telegram job chat ID <input id="telegramJobChatId" /></label>
+            <label>Telegram manager chat ID <input id="telegramManagerChatId" /></label>
+            <label>Telegram bot token <input id="telegramBotToken" type="password" placeholder="Leave blank to keep current" /></label>
+            <label class="toggle"><input type="checkbox" id="telegramAckEnabled" /> Telegram acknowledgements</label>
+            <label>BlueBubbles URL <input id="bluebubblesServerUrl" /></label>
+            <label>BlueBubbles password <input id="bluebubblesPassword" type="password" placeholder="Leave blank to keep current" /></label>
+            <label>Webhook secret <input id="bluebubblesWebhookSecret" type="password" placeholder="Leave blank to keep current" /></label>
+            <label>BlueBubbles send method <input id="bluebubblesSendMethod" placeholder="private-api" /></label>
+            <label>BlueBubbles service order <input id="bluebubblesServiceOrder" placeholder="iMessage,SMS" /></label>
+            <label class="toggle"><input type="checkbox" id="bluebubblesAddressFallback" /> Address fallback</label>
+            <div class="copy-row">
+              <label>BlueBubbles webhook URL <input id="bluebubblesWebhookUrl" readonly /></label>
+              <button type="button" class="secondary" id="copyWebhookUrlBtn">Copy</button>
+            </div>
+            <label>LLM provider
+              <select id="llmProvider">
+                <option value="ollama">Ollama</option>
+                <option value="gemini">Gemini</option>
+                <option value="disabled">Disabled fallback</option>
+              </select>
+            </label>
+            <label>Ollama base URL <input id="ollamaBaseUrl" /></label>
+            <label>Ollama model <input id="ollamaModel" /></label>
+            <label>Gemini model <input id="geminiModel" /></label>
+            <label>Gemini API key <input id="geminiApiKey" type="password" placeholder="Leave blank to keep current" /></label>
+            <label class="toggle"><input type="checkbox" id="autoSendFollowup" /> Auto-send follow-up after OCR</label>
+            <label>Max agent messages <input id="followupMaxAgentMessages" type="number" min="1" max="50" /></label>
+            <label>Conversation window days <input id="followupConversationWindowDays" type="number" min="1" max="3650" /></label>
+            <div class="button-row">
+              <button type="submit">Save settings</button>
+              <button type="button" class="secondary" id="testBlueBubblesBtn">Test BlueBubbles</button>
+            </div>
+            <p class="muted" id="settingsStatus"></p>
+            <p class="muted" id="databaseStatus"></p>
+          </form>
+        </section>
+      </main>
+
+      <nav class="bottom-nav">
+        <button class="nav-button active" data-view="jobsView" data-title="Jobs">Jobs</button>
+        <button class="nav-button" data-view="reviewView" data-title="Review">Review</button>
+        <button class="nav-button" data-view="conversationView" data-title="Conversation">Chat</button>
+        <button class="nav-button" data-view="promptView" data-title="Prompt">Prompt</button>
+        <button class="nav-button" data-view="settingsView" data-title="Settings">Settings</button>
+      </nav>
+    </div>
+    <script src="/assets/app.js?v=20260904-source-poster"></script>
+  </body>
+</html>

@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.*
+!.env.example
+data/
+*.traineddata
+*.deb
+tools/pgsql/
+tools/debs/
+coverage/
+dist/
+npm-debug.log*
+.DS_Store

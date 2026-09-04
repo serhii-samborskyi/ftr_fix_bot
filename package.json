@@ -1,0 +1,47 @@
+{
+  "name": "ftr-fix-bot",
+  "version": "0.1.0",
+  "description": "Telegram job image OCR and BlueBubbles customer follow-up agent.",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node scripts/start.js",
+    "serve": "node src/server.js",
+    "dev": "node --watch --env-file=.env src/server.js",
+    "check": "PRISMA_HIDE_UPDATE_MESSAGE=1 prisma validate && node --check scripts/start.js && node --check src/server.js && node --check src/config.js && node --check src/db.js && node --check src/prisma.js && node --check src/telegramBot.js && node --check src/routes/api.js && node --check src/routes/auth.js && node --check src/routes/webhooks.js && node --check src/services/agent.js && node --check src/services/bluebubbles.js && node --check src/services/jobs.js && node --check src/services/ocr.js && node --check src/services/settings.js && node --check src/services/workerLogs.js && node --check src/utils/errors.js && node --check src/utils/phone.js && node --check public/assets/app.js",
+    "db:generate": "prisma generate",
+    "db:migrate": "node scripts/start.js --migrate-only && node src/server.js --migrate-only",
+    "db:migrate:legacy": "node src/server.js --migrate-only",
+    "db:studio": "prisma studio",
+    "db:push": "prisma db push",
+    "pg:install": "bash scripts/local-postgres.sh install",
+    "pg:start": "bash scripts/local-postgres.sh start",
+    "pg:stop": "bash scripts/local-postgres.sh stop",
+    "pg:status": "bash scripts/local-postgres.sh status",
+    "pg:psql": "bash scripts/local-postgres.sh psql",
+    "test:smoke": "node --env-file=.env scripts/smoke-test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.12.0",
+    "bcryptjs": "^2.4.3",
+    "cookie-session": "^2.1.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "libphonenumber-js": "^1.11.17",
+    "morgan": "^1.10.0",
+    "multer": "^2.3.0",
+    "pg": "^8.13.1",
+    "prisma": "^6.12.0",
+    "sharp": "^0.35.4",
+    "telegraf": "^4.16.3",
+    "tesseract.js": "^6.0.0",
+    "zod": "^3.24.1"
+  },
+  "overrides": {
+    "qs": "6.16.0"
+  }
+}
