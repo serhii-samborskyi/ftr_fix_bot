@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
     <title>FTR Fix Bot</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/assets/styles.css?v=20260905-primary-phone" />
+    <link rel="stylesheet" href="/assets/styles.css?v=20260905-chat-thread" />
   </head>
   <body>
     <div class="app-shell">
@@ -72,15 +72,32 @@
           </div>
         </section>
 
-        <section class="view" id="conversationView">
-          <div class="recent-chat-list" id="recentChatList"></div>
-          <div class="conversation-header" id="conversationHeader"></div>
-          <div class="conversation" id="conversationList"></div>
-          <form class="manual-message-form" id="manualMessageForm">
-            <label class="toggle"><input type="checkbox" id="conversationAiIgnore" /> AI ignore</label>
-            <textarea id="manualMessage" rows="3" placeholder="Type a manual message"></textarea>
-            <button type="submit">Send message</button>
-          </form>
+        <section class="view chat-view" id="conversationView">
+          <div class="chat-shell">
+            <section class="chat-pane chat-inbox-pane" id="chatInboxPane">
+              <div class="chat-section-header">
+                <p class="eyebrow">Messages</p>
+                <strong>Recent chats</strong>
+              </div>
+              <div class="recent-chat-list" id="recentChatList"></div>
+            </section>
+            <section class="chat-pane chat-thread-pane hidden" id="chatThreadPane">
+              <div class="thread-topbar">
+                <button type="button" class="chat-back-button" id="chatBackBtn">&lsaquo; Chats</button>
+                <div class="thread-title-block">
+                  <strong id="conversationHeader"></strong>
+                  <small id="conversationMeta"></small>
+                </div>
+                <span class="service-badge" id="conversationServiceBadge">Unknown</span>
+              </div>
+              <div class="conversation" id="conversationList"></div>
+              <form class="manual-message-form" id="manualMessageForm">
+                <label class="toggle"><input type="checkbox" id="conversationAiIgnore" /> AI ignore</label>
+                <textarea id="manualMessage" rows="3" placeholder="Type a manual message"></textarea>
+                <button type="submit">Send message</button>
+              </form>
+            </section>
+          </div>
         </section>
 
         <section class="view" id="promptView">
@@ -182,13 +199,13 @@
       <nav class="bottom-nav">
         <button class="nav-button active" data-view="jobsView" data-title="Jobs">Jobs</button>
         <button class="nav-button" data-view="reviewView" data-title="Review">Review</button>
-        <button class="nav-button" data-view="conversationView" data-title="Conversation">Chat</button>
+        <button class="nav-button" data-view="conversationView" data-title="Chat">Chat</button>
         <button class="nav-button" data-view="promptView" data-title="Prompt">Prompt</button>
         <button class="nav-button" data-view="settingsView" data-title="Settings">Settings</button>
       </nav>
     </div>
     <div class="global-busy hidden" id="globalBusy">Working</div>
     <div class="global-status hidden" id="globalStatus"></div>
-    <script src="/assets/app.js?v=20260905-primary-phone"></script>
+    <script src="/assets/app.js?v=20260905-chat-thread"></script>
   </body>
 </html>

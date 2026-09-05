@@ -6,6 +6,7 @@ const state = {
   selectedJob: null,
   settings: null,
   worker: null,
+  chatMode: 'inbox',
   busyCount: 0
 };
 
@@ -140,6 +141,60 @@ function phoneSummary(job) {
     (job.normalizedPrimaryPhone && job.normalizedPhone && job.normalizedPrimaryPhone === job.normalizedPhone);
   if (job.primaryPhone && !sameNumber) phones.push(`Primary ${job.primaryPhone}`);
   return phones.join(' / ') || 'No phone';
+}
+
+function chatServiceLabel(service) {
+  const text = String(service || '').trim();
+  if (/^sms$/i.test(text)) return 'SMS';
+  if (/^imessage$/i.test(text)) return 'iMessage';
+  return text || 'Unknown';
+}
+
+function chatServiceClass(service) {
+  const label = chatServiceLabel(service).toLowerCase();
+  if (label === 'sms') return 'sms';
+  if (label === 'imessage') return 'imessage';
+  return 'unknown';
+}
+
+function serviceBadgeHtml(service) {
+  const label = chatServiceLabel(service);
+  return `<span class="service-badge ${chatServiceClass(label)}">${escapeHtml(label)}</span>`;
+}
+
+function setConversationServiceBadge(service) {
+  const badge = $('#conversationServiceBadge');
+  if (!badge) return;
+  const label = chatServiceLabel(service);
+  badge.textContent = label;
+  badge.className = `service-badge ${chatServiceClass(label)}`;
+}
+
+function conversationService(messages = [], job = state.selectedJob) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.chatService) return messages[index].chatService;
+  }
+  return job?.followupChatService || '';
+}
+
+function setConversationHeader(job = state.selectedJob, service = '') {
+  $('#conversationHeader').textContent = job?.customerName || 'Unknown customer';
+  $('#conversationMeta').textContent = job ? `${phoneSummary(job)} - ${techLabel(job)}` : '';
+  setConversationServiceBadge(service || job?.followupChatService || '');
+}
+
+function showChatInbox() {
+  state.chatMode = 'inbox';
+  $('#chatInboxPane')?.classList.remove('hidden');
+  $('#chatThreadPane')?.classList.add('hidden');
+  if ($('#conversationView')?.classList.contains('active')) $('#viewTitle').textContent = 'Chat';
+}
+
+function showChatThread() {
+  state.chatMode = 'thread';
+  $('#chatInboxPane')?.classList.add('hidden');
+  $('#chatThreadPane')?.classList.remove('hidden');
+  if ($('#conversationView')?.classList.contains('active')) $('#viewTitle').textContent = 'Conversation';
 }
 
 function renderStats(stats) {
@@ -296,7 +351,7 @@ function fillJobForm(job) {
   $('#jobTechMeta').textContent = `Technician: ${techLabel(job)}${job.techTelegramId ? ` - Telegram ${job.techTelegramId}` : ''}`;
   $('#jobError').textContent = job.followupLastError ? `Follow-up error: ${job.followupLastError}` : '';
   $('#jobError').classList.toggle('hidden', !job.followupLastError);
-  $('#conversationHeader').textContent = `${job.customerName || 'Unknown customer'} - ${phoneSummary(job)} - ${techLabel(job)}`;
+  setConversationHeader(job);
   const posterMeta = renderTelegramPosterMeta(job);
   $('#sourcePosterMeta').innerHTML = posterMeta;
   $('#sourcePosterMeta').classList.toggle('hidden', !posterMeta);
@@ -320,7 +375,10 @@ function clearSelectedJob() {
   $('#jobError').textContent = '';
   $('#jobError').classList.add('hidden');
   $('#conversationHeader').textContent = '';
+  $('#conversationMeta').textContent = '';
+  setConversationServiceBadge('');
   $('#conversationList').innerHTML = '<div class="empty">Select a conversation.</div>';
+  showChatInbox();
   renderManualComposer();
 }
 
@@ -330,27 +388,36 @@ async function loadJob(id, view = 'reviewView') {
   if (view === 'conversationView') {
     await loadConversation(id);
     await loadRecentConversations();
+    showChatThread();
   }
   showView(view, view === 'conversationView' ? 'Conversation' : 'Review');
 }
 
 function renderConversation(messages = []) {
-  $('#conversationList').innerHTML =
+  const list = $('#conversationList');
+  const service = conversationService(messages);
+  setConversationHeader(state.selectedJob, service);
+  list.innerHTML =
     messages
       .map(
         (message) => `
           <div class="bubble ${message.direction}">
             <p>${escapeHtml(message.body)}</p>
-            <small>${formatDate(message.createdAt)}</small>
+            <small class="bubble-meta">
+              <span>${formatDate(message.createdAt)}</span>
+              ${message.chatService ? serviceBadgeHtml(message.chatService) : ''}
+            </small>
           </div>
         `
       )
       .join('') || '<div class="empty">No messages yet.</div>';
+  list.scrollTop = list.scrollHeight;
 }
 
 async function loadConversation(id = state.selectedJob?.id) {
   if (!id) {
     $('#conversationList').innerHTML = '<div class="empty">Select a conversation.</div>';
+    setConversationHeader(null);
     renderManualComposer();
     return;
   }
@@ -369,11 +436,18 @@ function renderRecentConversations(items = []) {
   list.innerHTML = items
     .map(({ job, lastMessage }) => {
       const active = state.selectedJob?.id === job.id ? 'active' : '';
+      const service = lastMessage?.chatService || job.followupChatService || '';
       return `
         <button class="recent-chat ${active}" data-chat-job-id="${job.id}">
-          <strong>${escapeHtml(job.customerName || 'Unknown customer')} - ${escapeHtml(phoneSummary(job))}</strong>
-          <span>${escapeHtml(lastMessage?.body || '')}</span>
-          <small>${formatDate(lastMessage?.createdAt)} - ${escapeHtml(techLabel(job))}${job.aiIgnore ? ' - AI ignored' : ''}</small>
+          <span class="recent-chat-main">
+            <span class="recent-chat-title">
+              <strong>${escapeHtml(job.customerName || 'Unknown customer')}</strong>
+              <small>${formatDate(lastMessage?.createdAt)}</small>
+            </span>
+            <span class="recent-chat-preview">${escapeHtml(lastMessage?.body || '')}</span>
+            <small>${escapeHtml(phoneSummary(job))} - ${escapeHtml(techLabel(job))}${job.aiIgnore ? ' - AI ignored' : ''}</small>
+          </span>
+          ${serviceBadgeHtml(service)}
         </button>
       `;
     })
@@ -398,7 +472,13 @@ async function deleteJob(id = state.selectedJob?.id) {
   await api(`/api/jobs/${id}`, { method: 'DELETE' });
   if (state.selectedJob?.id === id) {
     clearSelectedJob();
-    showView('jobsView', 'Jobs');
+    if ($('#conversationView').classList.contains('active')) {
+      await loadRecentConversations();
+      showView('conversationView', 'Chat');
+      showChatInbox();
+    } else {
+      showView('jobsView', 'Jobs');
+    }
   }
   await refreshMainData();
   await loadRecentConversations();
@@ -674,7 +754,7 @@ function wireEvents() {
       withButtonLoading(button, '', async () => {
         if (button.dataset.view === 'conversationView') {
           await loadRecentConversations();
-          await loadConversation();
+          showChatInbox();
         }
         if (button.dataset.view === 'settingsView') {
           await loadTechnicians();
@@ -692,7 +772,10 @@ function wireEvents() {
         $$('.chip').forEach((item) => item.classList.toggle('active', item === chip));
         $('#customRange').classList.toggle('hidden', state.range !== 'custom');
         await refreshMainData();
-        if ($('#conversationView').classList.contains('active')) await loadRecentConversations();
+        if ($('#conversationView').classList.contains('active')) {
+          await loadRecentConversations();
+          if (state.chatMode === 'thread' && state.selectedJob) await loadConversation(state.selectedJob.id);
+        }
       })
     );
   });
@@ -700,7 +783,10 @@ function wireEvents() {
   $('#techFilter').addEventListener('change', async (event) => {
     state.techFilter = event.currentTarget.value;
     await refreshMainData();
-    if ($('#conversationView').classList.contains('active')) await loadRecentConversations();
+    if ($('#conversationView').classList.contains('active')) {
+      await loadRecentConversations();
+      if (state.chatMode === 'thread' && state.selectedJob) await loadConversation(state.selectedJob.id);
+    }
   });
 
   $('#fromDate').addEventListener('change', refreshMainData);
@@ -711,9 +797,14 @@ function wireEvents() {
       await loadTechnicians();
       await refreshMainData();
       if (state.selectedJob) {
-        await loadJob(state.selectedJob.id, $('#conversationView').classList.contains('active') ? 'conversationView' : 'reviewView');
+        if ($('#conversationView').classList.contains('active') && state.chatMode === 'inbox') {
+          await loadRecentConversations();
+          showChatInbox();
+        } else {
+          await loadJob(state.selectedJob.id, $('#conversationView').classList.contains('active') ? 'conversationView' : 'reviewView');
+        }
       }
-      if ($('#conversationView').classList.contains('active')) await loadRecentConversations();
+      if ($('#conversationView').classList.contains('active') && state.chatMode === 'inbox') await loadRecentConversations();
     })
   );
 
@@ -818,6 +909,11 @@ function wireEvents() {
     } finally {
       event.currentTarget.disabled = false;
     }
+  });
+
+  $('#chatBackBtn').addEventListener('click', () => {
+    showChatInbox();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
   $('#manualMessageForm').addEventListener('submit', async (event) => {

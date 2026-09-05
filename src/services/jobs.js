@@ -47,6 +47,57 @@ const jobTechJoin = `
   ) tech ON true
 `;
 
+function normalizeChatService(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+
+  const guidService = text.split(';-;')[0].trim();
+  if (/^sms$/i.test(guidService) || /\bSMS\b/i.test(text)) return 'SMS';
+  if (/^imessage$/i.test(guidService) || /\biMessage\b/i.test(text)) return 'iMessage';
+  return '';
+}
+
+function rawObject(raw) {
+  if (!raw) return {};
+  if (typeof raw === 'object') return raw;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+function chatServiceFromRaw(raw) {
+  const data = rawObject(raw);
+  const candidates = [
+    data.deliveryAttempt?.service,
+    data.deliveryAttempt?.chatGuid,
+    data.deliveryAttempt?.label,
+    data.chatGuid,
+    data.chat?.guid,
+    data.chats?.[0]?.guid,
+    data.data?.chatGuid,
+    data.data?.chat?.guid,
+    data.data?.chats?.[0]?.guid,
+    data.message?.chatGuid,
+    data.message?.chat?.guid,
+    data.message?.chats?.[0]?.guid,
+    data.service,
+    data.data?.service,
+    data.message?.service
+  ];
+
+  for (const candidate of candidates) {
+    const service = normalizeChatService(candidate);
+    if (service) return service;
+  }
+  return '';
+}
+
+function chatServiceForConversation(row) {
+  return normalizeChatService(row?.external_chat_guid) || chatServiceFromRaw(row?.raw);
+}
+
 export function toJob(row) {
   if (!row) return null;
   return {
@@ -80,6 +131,7 @@ export function toJob(row) {
     techTelegramId: row.tech_telegram_id,
     followupStatus: row.followup_status,
     followupChatGuid: row.followup_chat_guid,
+    followupChatService: normalizeChatService(row.followup_chat_guid),
     followupLastError: row.followup_last_error,
     escalatedAt: row.escalated_at,
     lastContactAt: row.last_contact_at,
@@ -948,6 +1000,7 @@ export async function getConversation(jobId) {
     body: row.body,
     externalGuid: row.external_guid,
     externalChatGuid: row.external_chat_guid,
+    chatService: chatServiceForConversation(row),
     raw: row.raw,
     createdAt: row.created_at
   }));
@@ -961,11 +1014,13 @@ export async function listRecentConversations({ range = 'today', from = '', to =
              latest.id AS last_message_id,
              latest.direction AS last_message_direction,
              latest.body AS last_message_body,
+             latest.external_chat_guid AS last_message_external_chat_guid,
+             latest.raw AS last_message_raw,
              latest.created_at AS last_message_created_at
       FROM jobs
       ${jobTechJoin}
       JOIN LATERAL (
-        SELECT id, direction, body, created_at
+        SELECT id, direction, body, external_chat_guid, raw, created_at
         FROM conversations
         WHERE conversations.job_id = jobs.id
         ORDER BY created_at DESC
@@ -984,6 +1039,11 @@ export async function listRecentConversations({ range = 'today', from = '', to =
       id: row.last_message_id,
       direction: row.last_message_direction,
       body: row.last_message_body,
+      externalChatGuid: row.last_message_external_chat_guid,
+      chatService: chatServiceForConversation({
+        external_chat_guid: row.last_message_external_chat_guid,
+        raw: row.last_message_raw
+      }),
       createdAt: row.last_message_created_at
     }
   }));
