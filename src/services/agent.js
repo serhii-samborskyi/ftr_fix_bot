@@ -78,6 +78,7 @@ const satisfiedPatterns = [
 function renderTemplate(template, job) {
   return String(template || '')
     .replaceAll('{{name}}', job.customer_name || job.customerName || 'there')
+    .replaceAll('{{tech}}', job.techName || job.tech_name || 'your technician')
     .replaceAll('{{address}}', job.address || 'your address')
     .replaceAll('{{accountNumber}}', job.account_number || job.accountNumber || '')
     .replace(/\s+/g, ' ')
@@ -88,15 +89,17 @@ function jobValue(job, camelKey, snakeKey = camelKey) {
   return job?.[camelKey] || job?.[snakeKey] || '';
 }
 
-function cleanInitialFollowup(content, fallback) {
+function cleanInitialFollowup(content, fallback, { requiredText = '' } = {}) {
   const text = String(content || '').trim().replace(/^["']|["']$/g, '');
   const lower = text.toLowerCase();
+  const required = String(requiredText || '').trim().toLowerCase();
 
   if (!text) return fallback;
   if (lower.includes('missing information')) return fallback;
   if (lower.includes('provide') && (lower.includes('customer') || lower.includes('name') || lower.includes('address'))) {
     return fallback;
   }
+  if (required && String(fallback || '').toLowerCase().includes(required) && !lower.includes(required)) return fallback;
 
   return text;
 }
@@ -336,12 +339,13 @@ Customer name: ${jobValue(job, 'customerName', 'customer_name') || 'there'}
 Phone: ${jobValue(job, 'phone')}
 Account: ${jobValue(job, 'accountNumber', 'account_number')}
 Address: ${jobValue(job, 'address') || 'the service address'}
+Technician: ${jobValue(job, 'techName', 'tech_name') || 'the technician'}
 
 Do not ask the customer to provide their name, address, account number, or other internal job details.
 Only ask whether they were satisfied with the service visit.`
       }
     ]);
-    return cleanInitialFollowup(content, fallback);
+    return cleanInitialFollowup(content, fallback, { requiredText: jobValue(job, 'techName', 'tech_name') });
   } catch (error) {
     addWorkerLog('agent', 'warn', 'Initial follow-up model failed; using template', errorToLogMeta(error, {
       provider: settings.llmProvider,

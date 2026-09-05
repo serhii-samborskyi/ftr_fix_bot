@@ -1,8 +1,10 @@
 import { config } from '../config.js';
 import { query } from '../db.js';
+import { normalizeTimeZone } from '../utils/time.js';
 
 const defaults = {
   appBaseUrl: config.appBaseUrl,
+  appTimeZone: config.appTimeZone,
   telegramJobChatTitle: config.telegram.jobChatTitle,
   telegramJobChatId: config.telegram.jobChatId,
   telegramManagerChatId: config.telegram.managerChatId,
@@ -45,7 +47,7 @@ When classifying a reply, return strict JSON only with:
   "concern_summary": "short manager summary, or empty string"
 }`,
   initialMessageTemplate:
-    'Hi {{name}}, this is FTR Fix following up on your recent service visit. Were you satisfied with the work completed?'
+    'Hi {{name}}, this is FTR Fix following up on your recent service visit with {{tech}}. Were you satisfied with the work completed?'
 };
 
 const secretDefaults = {
@@ -93,6 +95,7 @@ export async function getRuntimeSettings() {
 
   return {
     appBaseUrl: merged.appBaseUrl,
+    appTimeZone: normalizeTimeZone(merged.appTimeZone),
     telegramJobChatTitle: merged.telegramJobChatTitle,
     telegramJobChatId: merged.telegramJobChatId,
     telegramManagerChatId: merged.telegramManagerChatId,
@@ -135,6 +138,7 @@ export async function getPublicSettings() {
   const settings = await getRuntimeSettings();
   return {
     appBaseUrl: settings.appBaseUrl,
+    appTimeZone: settings.appTimeZone,
     telegramJobChatTitle: settings.telegramJobChatTitle,
     telegramJobChatId: settings.telegramJobChatId,
     telegramManagerChatId: settings.telegramManagerChatId,
@@ -163,6 +167,7 @@ export async function getPublicSettings() {
 export async function updatePublicSettings(payload) {
   const editable = [
     'appBaseUrl',
+    'appTimeZone',
     'telegramJobChatTitle',
     'telegramJobChatId',
     'telegramManagerChatId',

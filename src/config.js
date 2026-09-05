@@ -15,6 +15,7 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: number(process.env.PORT, 3000),
   appBaseUrl: process.env.APP_BASE_URL || '',
+  appTimeZone: process.env.APP_TIME_ZONE || process.env.TZ || 'America/Chicago',
   dataDir: path.resolve(process.env.DATA_DIR || path.join(process.cwd(), 'data')),
   databaseUrl: process.env.DATABASE_URL,
   admin: {

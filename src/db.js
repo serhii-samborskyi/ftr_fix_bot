@@ -78,6 +78,7 @@ export async function runMigrations() {
   await query('ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source_sender_username text');
   await query('ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source_sender_name text');
   await query('ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source_sender_is_bot boolean');
+  await query('ALTER TABLE jobs ADD COLUMN IF NOT EXISTS ai_ignore boolean NOT NULL DEFAULT false');
 
   await query(`
     CREATE UNIQUE INDEX IF NOT EXISTS jobs_source_message_uidx
@@ -118,6 +119,19 @@ export async function runMigrations() {
   `);
 
   await query('CREATE INDEX IF NOT EXISTS escalations_job_created_idx ON escalations(job_id, created_at)');
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS technicians (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      name text NOT NULL,
+      tech_id text NOT NULL UNIQUE,
+      telegram_id text NOT NULL UNIQUE,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+
+  await query('CREATE INDEX IF NOT EXISTS technicians_telegram_id_idx ON technicians(telegram_id)');
 }
 
 export async function closeDb() {

@@ -15,11 +15,23 @@ import {
 } from './bluebubbles.js';
 import { extractJobFromImage } from './ocr.js';
 import { getRuntimeSettings } from './settings.js';
+import { unmatchedTechFilter } from './techs.js';
 import { addWorkerLog } from './workerLogs.js';
 import { errorToLogMeta, errorToStoredMessage, truncateText } from '../utils/errors.js';
+import { dateRangeForFilter } from '../utils/time.js';
 
 const deliveryCheckTimers = new Set();
 const deliveryFallbackTimers = new Set();
+
+const jobSelect = `
+  jobs.*,
+  tech.id AS tech_db_id,
+  tech.name AS tech_name,
+  tech.tech_id AS tech_id,
+  tech.telegram_id AS tech_telegram_id
+`;
+
+const jobTechJoin = 'LEFT JOIN technicians tech ON tech.telegram_id = jobs.source_sender_id';
 
 export function toJob(row) {
   if (!row) return null;
@@ -45,6 +57,11 @@ export function toJob(row) {
     ocrText: row.ocr_text,
     ocrConfidence: row.ocr_confidence === null ? null : Number(row.ocr_confidence),
     ocrRaw: row.ocr_raw,
+    aiIgnore: row.ai_ignore,
+    techDbId: row.tech_db_id,
+    techName: row.tech_name,
+    techId: row.tech_id,
+    techTelegramId: row.tech_telegram_id,
     followupStatus: row.followup_status,
     followupChatGuid: row.followup_chat_guid,
     followupLastError: row.followup_last_error,
@@ -55,39 +72,56 @@ export function toJob(row) {
   };
 }
 
-function dateFilter(range, from, to) {
-  const clauses = [];
-  const params = [];
-
-  if (range === 'today') {
-    clauses.push("created_at >= date_trunc('day', now())");
-  } else if (range === 'yesterday') {
-    clauses.push("created_at >= date_trunc('day', now()) - interval '1 day'");
-    clauses.push("created_at < date_trunc('day', now())");
-  } else if (range === 'lastweek') {
-    clauses.push("created_at >= now() - interval '7 days'");
-  } else {
-    if (from) {
-      params.push(from);
-      clauses.push(`created_at >= $${params.length}`);
-    }
-    if (to) {
-      params.push(to);
-      clauses.push(`created_at < ($${params.length}::date + interval '1 day')`);
-    }
+function appendDateFilter(clauses, params, { range = 'today', from = '', to = '', timeZone = '' } = {}) {
+  const dateRange = dateRangeForFilter({ range, from, to, timeZone });
+  if (dateRange.start) {
+    params.push(dateRange.start);
+    clauses.push(`jobs.created_at >= $${params.length}`);
   }
-
-  return { where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params };
+  if (dateRange.end) {
+    params.push(dateRange.end);
+    clauses.push(`jobs.created_at < $${params.length}`);
+  }
+  return dateRange;
 }
 
-export async function listJobs({ range = 'today', from = '', to = '' } = {}) {
-  const filter = dateFilter(range, from, to);
+function appendTechFilter(clauses, params, techId = '') {
+  const filter = String(techId || '').trim();
+  if (!filter || filter === 'all') return;
+
+  if (filter === unmatchedTechFilter) {
+    clauses.push('tech.id IS NULL');
+    return;
+  }
+
+  params.push(filter);
+  clauses.push(`tech.id = $${params.length}`);
+}
+
+async function jobFilters({ range = 'today', from = '', to = '', techId = '' } = {}) {
+  const clauses = [];
+  const params = [];
+  const settings = await getRuntimeSettings();
+  const dateRange = appendDateFilter(clauses, params, {
+    range,
+    from,
+    to,
+    timeZone: settings.appTimeZone
+  });
+  appendTechFilter(clauses, params, techId);
+
+  return { where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params, dateRange };
+}
+
+export async function listJobs({ range = 'today', from = '', to = '', techId = '' } = {}) {
+  const filter = await jobFilters({ range, from, to, techId });
   const result = await query(
     `
-      SELECT *
+      SELECT ${jobSelect}
       FROM jobs
+      ${jobTechJoin}
       ${filter.where}
-      ORDER BY created_at DESC
+      ORDER BY jobs.created_at DESC
       LIMIT 250
     `,
     filter.params
@@ -96,7 +130,15 @@ export async function listJobs({ range = 'today', from = '', to = '' } = {}) {
 }
 
 export async function getJob(id) {
-  const result = await query('SELECT * FROM jobs WHERE id = $1', [id]);
+  const result = await query(
+    `
+      SELECT ${jobSelect}
+      FROM jobs
+      ${jobTechJoin}
+      WHERE jobs.id = $1
+    `,
+    [id]
+  );
   return toJob(result.rows[0]);
 }
 
@@ -107,7 +149,8 @@ export async function updateJob(id, payload) {
     accountNumber: 'account_number',
     address: 'address',
     status: 'status',
-    followupStatus: 'followup_status'
+    followupStatus: 'followup_status',
+    aiIgnore: 'ai_ignore'
   };
 
   const assignments = [];
@@ -131,11 +174,12 @@ export async function updateJob(id, payload) {
       UPDATE jobs
       SET ${assignments.join(', ')}, updated_at = now()
       WHERE id = $${params.length}
-      RETURNING *
+      RETURNING id
     `,
     params
   );
-  return toJob(result.rows[0]);
+  if (!result.rows[0]) return null;
+  return getJob(id);
 }
 
 export async function deleteJob(id) {
@@ -188,7 +232,7 @@ export async function createJobFromImage({
         source_sender_name = COALESCE(jobs.source_sender_name, EXCLUDED.source_sender_name),
         source_sender_is_bot = COALESCE(jobs.source_sender_is_bot, EXCLUDED.source_sender_is_bot),
         updated_at = jobs.updated_at
-      RETURNING *
+      RETURNING id
     `,
     [
       source,
@@ -204,7 +248,7 @@ export async function createJobFromImage({
       imageMime
     ]
   );
-  return toJob(result.rows[0]);
+  return getJob(result.rows[0].id);
 }
 
 export async function saveIncomingImage(buffer, filename = 'job.jpg') {
@@ -271,7 +315,7 @@ export async function processJobOcr(id) {
       ]
     );
 
-    const processed = toJob(result.rows[0]);
+    const processed = await getJob(result.rows[0].id);
     const settings = await getRuntimeSettings();
     if (settings.autoSendFollowup && canAutoFollowup) {
       if (!hasRequired) {
@@ -714,6 +758,72 @@ export async function sendInitialFollowup(id) {
   }
 }
 
+export async function sendManualJobMessage(id, message) {
+  const body = String(message || '').trim();
+  if (!body) throw new Error('Message text is required.');
+
+  const job = await getJob(id);
+  if (!job) throw new Error('Job not found');
+  const targetPhone = job.normalizedPhone || job.phone;
+  if (!targetPhone && !job.followupChatGuid) throw new Error('Job has no phone number or BlueBubbles chat GUID.');
+
+  const sent = await sendBlueBubblesText({
+    phone: targetPhone,
+    chatGuid: job.followupChatGuid,
+    message: body
+  });
+  const sentMessage = sentMessageFromResult(sent);
+  const chatGuid = getBlueBubblesChatGuid(sent, job.followupChatGuid || null);
+  const externalGuid = getBlueBubblesExternalGuid(sent);
+  const delivery = deliveryStateFromBlueBubblesMessage(sentMessage, externalGuid, chatGuid);
+  const raw = {
+    ...sent,
+    manual: true
+  };
+
+  await withTransaction(async (client) => {
+    await client.query(
+      `
+        UPDATE jobs
+        SET status = CASE WHEN status IN ('ocr_ready', 'received', 'needs_review') THEN 'contacted' ELSE status END,
+            followup_status = CASE
+              WHEN followup_status IN ('concern', 'satisfied', 'limit_reached') THEN followup_status
+              ELSE $3
+            END,
+            followup_chat_guid = COALESCE($2, followup_chat_guid),
+            followup_last_error = CASE
+              WHEN followup_status IN ('concern', 'satisfied', 'limit_reached') THEN followup_last_error
+              ELSE $4
+            END,
+            last_contact_at = now(),
+            updated_at = now()
+        WHERE id = $1
+      `,
+      [id, chatGuid, delivery.followupStatus, delivery.followupLastError]
+    );
+    await client.query(
+      `
+        INSERT INTO conversations(job_id, direction, body, external_guid, external_chat_guid, raw)
+        VALUES ($1, 'outbound', $2, $3, $4, $5)
+        ON CONFLICT (external_guid) WHERE external_guid IS NOT NULL DO NOTHING
+      `,
+      [id, body, externalGuid, chatGuid, JSON.stringify(raw)]
+    );
+  });
+
+  addWorkerLog('bluebubbles', 'info', 'Manual BlueBubbles message sent from app', {
+    jobId: id,
+    chatGuid: chatGuid || '',
+    externalGuid: externalGuid || '',
+    followupStatus: delivery.followupStatus,
+    isDelivered: String(Boolean(delivery.isDelivered)),
+    errorCode: delivery.errorCode || ''
+  });
+
+  if (delivery.followupStatus === 'delivery_pending') scheduleDeliveryChecks(id, externalGuid);
+  return { job: await getJob(id), delivery };
+}
+
 export async function getConversation(jobId) {
   const result = await query(
     `
@@ -737,6 +847,112 @@ export async function getConversation(jobId) {
   }));
 }
 
+export async function listRecentConversations({ range = 'today', from = '', to = '', techId = '' } = {}) {
+  const filter = await jobFilters({ range, from, to, techId });
+  const result = await query(
+    `
+      SELECT ${jobSelect},
+             latest.id AS last_message_id,
+             latest.direction AS last_message_direction,
+             latest.body AS last_message_body,
+             latest.created_at AS last_message_created_at
+      FROM jobs
+      ${jobTechJoin}
+      JOIN LATERAL (
+        SELECT id, direction, body, created_at
+        FROM conversations
+        WHERE conversations.job_id = jobs.id
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) latest ON true
+      ${filter.where}
+      ORDER BY latest.created_at DESC
+      LIMIT 50
+    `,
+    filter.params
+  );
+
+  return result.rows.map((row) => ({
+    job: toJob(row),
+    lastMessage: {
+      id: row.last_message_id,
+      direction: row.last_message_direction,
+      body: row.last_message_body,
+      createdAt: row.last_message_created_at
+    }
+  }));
+}
+
+export async function getDashboardStats({ range = 'today', from = '', to = '', techId = '' } = {}) {
+  const filter = await jobFilters({ range, from, to, techId });
+  const summary = await query(
+    `
+      SELECT count(DISTINCT jobs.id)::int AS jobs,
+             count(DISTINCT jobs.id) FILTER (
+               WHERE jobs.followup_status <> 'not_started' OR outbound.job_id IS NOT NULL
+             )::int AS followups,
+             count(DISTINCT jobs.id) FILTER (
+               WHERE jobs.followup_status = 'satisfied' OR jobs.status = 'satisfied'
+             )::int AS satisfactions,
+             count(DISTINCT jobs.id) FILTER (
+               WHERE jobs.followup_status = 'concern' OR jobs.status = 'concern' OR escalations.id IS NOT NULL
+             )::int AS escalations
+      FROM jobs
+      ${jobTechJoin}
+      LEFT JOIN (SELECT DISTINCT job_id FROM conversations WHERE direction = 'outbound') outbound ON outbound.job_id = jobs.id
+      LEFT JOIN escalations ON escalations.job_id = jobs.id
+      ${filter.where}
+    `,
+    filter.params
+  );
+
+  const byTech = await query(
+    `
+      SELECT COALESCE(tech.id::text, 'unmatched') AS tech_filter,
+             COALESCE(tech.name, 'Unmatched') AS tech_name,
+             COALESCE(tech.tech_id, '') AS tech_id,
+             count(DISTINCT jobs.id)::int AS jobs,
+             count(DISTINCT jobs.id) FILTER (
+               WHERE jobs.followup_status <> 'not_started' OR outbound.job_id IS NOT NULL
+             )::int AS followups,
+             count(DISTINCT jobs.id) FILTER (
+               WHERE jobs.followup_status = 'satisfied' OR jobs.status = 'satisfied'
+             )::int AS satisfactions,
+             count(DISTINCT jobs.id) FILTER (
+               WHERE jobs.followup_status = 'concern' OR jobs.status = 'concern' OR escalations.id IS NOT NULL
+             )::int AS escalations
+      FROM jobs
+      ${jobTechJoin}
+      LEFT JOIN (SELECT DISTINCT job_id FROM conversations WHERE direction = 'outbound') outbound ON outbound.job_id = jobs.id
+      LEFT JOIN escalations ON escalations.job_id = jobs.id
+      ${filter.where ? `${filter.where} AND` : 'WHERE'} jobs.id IS NOT NULL
+      GROUP BY tech.id, tech.name, tech.tech_id
+      ORDER BY escalations DESC, jobs DESC, lower(COALESCE(tech.name, 'Unmatched'))
+      LIMIT 20
+    `,
+    filter.params
+  );
+
+  return {
+    range: {
+      type: range,
+      timeZone: filter.dateRange.timeZone,
+      startDate: filter.dateRange.startDate,
+      endDate: filter.dateRange.endDate
+    },
+    summary: summary.rows[0] || { jobs: 0, followups: 0, satisfactions: 0, escalations: 0 },
+    byTech: byTech.rows.map((row) => ({
+      techFilter: row.tech_filter,
+      techName: row.tech_name,
+      techId: row.tech_id,
+      jobs: row.jobs,
+      followups: row.followups,
+      satisfactions: row.satisfactions,
+      escalations: row.escalations
+    }))
+  };
+}
+
 export async function getJobByPhoneOrChat({ phone, chatGuid }) {
   const normalized = normalizePhone(phone);
   const params = [];
@@ -744,11 +960,11 @@ export async function getJobByPhoneOrChat({ phone, chatGuid }) {
 
   if (normalized) {
     params.push(normalized);
-    clauses.push(`normalized_phone = $${params.length}`);
+    clauses.push(`jobs.normalized_phone = $${params.length}`);
   }
   if (chatGuid) {
     params.push(chatGuid);
-    clauses.push(`followup_chat_guid = $${params.length}`);
+    clauses.push(`jobs.followup_chat_guid = $${params.length}`);
   }
   if (!clauses.length) return null;
 
@@ -771,12 +987,13 @@ export async function getJobByPhoneOrChat({ phone, chatGuid }) {
 
   const result = await query(
     `
-      SELECT *
+      SELECT ${jobSelect}
       FROM jobs
+      ${jobTechJoin}
       WHERE (${clauses.join(' OR ')})
-        AND followup_status = ANY($${statusParam}::text[])
-        AND created_at >= now() - ($${windowParam}::int * interval '1 day')
-      ORDER BY created_at DESC
+        AND jobs.followup_status = ANY($${statusParam}::text[])
+        AND jobs.created_at >= now() - ($${windowParam}::int * interval '1 day')
+      ORDER BY jobs.created_at DESC
       LIMIT 1
     `,
     params

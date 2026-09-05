@@ -8,6 +8,7 @@ services:
       - .env
     environment:
       DATABASE_URL: postgres://ftr:ftr@postgres:5432/ftr_fix_bot
+      APP_TIME_ZONE: America/Chicago
       DATA_DIR: /app/data
       SKIP_PRISMA_MIGRATE: "false"
     volumes:

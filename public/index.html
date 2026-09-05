@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FTR Fix Bot</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/assets/styles.css?v=20260904-source-poster" />
+    <link rel="stylesheet" href="/assets/styles.css?v=20260905-tech-chat-stats" />
   </head>
   <body>
     <div class="app-shell">
@@ -30,6 +30,11 @@
             <label>From <input type="date" id="fromDate" /></label>
             <label>To <input type="date" id="toDate" /></label>
           </div>
+          <label class="filter-select">Technician
+            <select id="techFilter"></select>
+          </label>
+          <section class="stat-grid" id="dashboardStats"></section>
+          <section class="tech-stat-list" id="techStats"></section>
           <form class="upload-row" id="uploadForm">
             <input type="file" name="image" accept="image/*" />
             <button type="submit">Upload</button>
@@ -59,14 +64,22 @@
               <button type="button" class="danger-button wide" id="deleteJobBtn">Remove</button>
               <p class="job-error hidden" id="jobError"></p>
               <p class="muted" id="jobMeta"></p>
+              <p class="muted" id="jobTechMeta"></p>
               <p class="muted poster-meta hidden" id="sourcePosterMeta"></p>
+              <label class="toggle"><input type="checkbox" id="reviewAiIgnore" /> AI ignore</label>
             </form>
           </div>
         </section>
 
         <section class="view" id="conversationView">
+          <div class="recent-chat-list" id="recentChatList"></div>
           <div class="conversation-header" id="conversationHeader"></div>
           <div class="conversation" id="conversationList"></div>
+          <form class="manual-message-form" id="manualMessageForm">
+            <label class="toggle"><input type="checkbox" id="conversationAiIgnore" /> AI ignore</label>
+            <textarea id="manualMessage" rows="3" placeholder="Type a manual message"></textarea>
+            <button type="submit">Send message</button>
+          </form>
         </section>
 
         <section class="view" id="promptView">
@@ -100,11 +113,29 @@
             <button type="button" class="secondary" id="refreshWorkerLogsBtn">Refresh logs</button>
             <div class="worker-log-list" id="workerLogList"></div>
           </section>
+          <section class="settings-form">
+            <div>
+              <p class="eyebrow">Tech Match</p>
+              <strong>Technicians</strong>
+            </div>
+            <form class="tech-form" id="technicianForm">
+              <input type="hidden" id="technicianId" />
+              <label>Name <input id="technicianName" /></label>
+              <label>Tech ID <input id="technicianTechId" /></label>
+              <label>Telegram ID <input id="technicianTelegramId" /></label>
+              <div class="button-row">
+                <button type="submit" id="saveTechnicianBtn">Save tech</button>
+                <button type="button" class="secondary" id="clearTechnicianBtn">Clear</button>
+              </div>
+            </form>
+            <div class="technician-list" id="technicianList"></div>
+          </section>
           <form class="settings-form" id="settingsForm">
             <div class="copy-row">
               <label>App base URL <input id="appBaseUrl" placeholder="https://your-app.example" /></label>
               <button type="button" class="secondary" id="useCurrentDomainBtn">Use current</button>
             </div>
+            <label>App timezone <input id="appTimeZone" placeholder="America/Chicago" /></label>
             <label>Telegram job chat title <input id="telegramJobChatTitle" /></label>
             <label>Telegram job chat ID <input id="telegramJobChatId" /></label>
             <label>Telegram manager chat ID <input id="telegramManagerChatId" /></label>
@@ -152,6 +183,8 @@
         <button class="nav-button" data-view="settingsView" data-title="Settings">Settings</button>
       </nav>
     </div>
-    <script src="/assets/app.js?v=20260904-source-poster"></script>
+    <div class="global-busy hidden" id="globalBusy">Working</div>
+    <div class="global-status hidden" id="globalStatus"></div>
+    <script src="/assets/app.js?v=20260905-tech-chat-stats"></script>
   </body>
 </html>

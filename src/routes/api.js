@@ -11,21 +11,35 @@ import { errorToLogMeta } from '../utils/errors.js';
 import {
   createJobFromImage,
   deleteJob,
+  getDashboardStats,
   getConversation,
   getJob,
+  listRecentConversations,
   listJobs,
   processJobOcr,
   refreshJobDeliveryStatus,
   saveIncomingImage,
+  sendManualJobMessage,
   sendInitialFollowup,
   updateJob
 } from '../services/jobs.js';
 import { getPublicSettings, updatePublicSettings } from '../services/settings.js';
+import { createTechnician, deleteTechnician, listTechnicians, updateTechnician } from '../services/techs.js';
 import { getTelegramWorkerStatus, startTelegramBot, stopTelegramBot } from '../telegramBot.js';
+import { dateRangeForFilter } from '../utils/time.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 export const apiRouter = express.Router();
+
+function filterParams(req) {
+  return {
+    range: String(req.query.range || 'today'),
+    from: String(req.query.from || ''),
+    to: String(req.query.to || ''),
+    techId: String(req.query.techId || '')
+  };
+}
 
 async function countFiles(dir) {
   let entries = [];
@@ -60,12 +74,24 @@ function databaseTarget() {
 
 apiRouter.get('/jobs', async (req, res, next) => {
   try {
-    const jobs = await listJobs({
-      range: String(req.query.range || 'today'),
-      from: String(req.query.from || ''),
-      to: String(req.query.to || '')
-    });
+    const jobs = await listJobs(filterParams(req));
     res.json({ jobs });
+  } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.get('/stats', async (req, res, next) => {
+  try {
+    res.json({ stats: await getDashboardStats(filterParams(req)) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.get('/conversations/recent', async (req, res, next) => {
+  try {
+    res.json({ conversations: await listRecentConversations(filterParams(req)) });
   } catch (error) {
     next(error);
   }
@@ -103,7 +129,8 @@ apiRouter.patch('/jobs/:id', async (req, res, next) => {
       accountNumber: z.string().optional(),
       address: z.string().optional(),
       status: z.string().optional(),
-      followupStatus: z.string().optional()
+      followupStatus: z.string().optional(),
+      aiIgnore: z.boolean().optional()
     });
     const job = await updateJob(req.params.id, schema.parse(req.body));
     if (!job) return res.status(404).json({ error: 'Job not found' });
@@ -150,6 +177,18 @@ apiRouter.post('/jobs/:id/check-delivery', async (req, res, next) => {
   }
 });
 
+apiRouter.post('/jobs/:id/conversation', async (req, res, next) => {
+  try {
+    const schema = z.object({
+      message: z.string().trim().min(1)
+    });
+    const result = await sendManualJobMessage(req.params.id, schema.parse(req.body).message);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
 apiRouter.get('/jobs/:id/conversation', async (req, res, next) => {
   try {
     const messages = await getConversation(req.params.id);
@@ -185,19 +224,68 @@ apiRouter.patch('/settings', async (req, res, next) => {
   }
 });
 
+apiRouter.get('/technicians', async (req, res, next) => {
+  try {
+    res.json({ technicians: await listTechnicians() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.post('/technicians', async (req, res, next) => {
+  try {
+    const schema = z.object({
+      name: z.string().trim().min(1),
+      techId: z.string().trim().min(1),
+      telegramId: z.string().trim().min(1)
+    });
+    res.status(201).json({ technician: await createTechnician(schema.parse(req.body)) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.patch('/technicians/:id', async (req, res, next) => {
+  try {
+    const schema = z.object({
+      name: z.string().trim().min(1),
+      techId: z.string().trim().min(1),
+      telegramId: z.string().trim().min(1)
+    });
+    const technician = await updateTechnician(req.params.id, schema.parse(req.body));
+    if (!technician) return res.status(404).json({ error: 'Technician not found' });
+    res.json({ technician });
+  } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.delete('/technicians/:id', async (req, res, next) => {
+  try {
+    const technician = await deleteTechnician(req.params.id);
+    if (!technician) return res.status(404).json({ error: 'Technician not found' });
+    res.json({ ok: true, technician });
+  } catch (error) {
+    next(error);
+  }
+});
+
 apiRouter.get('/system/status', async (req, res, next) => {
   try {
+    const settings = await getPublicSettings();
+    const today = dateRangeForFilter({ range: 'today', timeZone: settings.appTimeZone });
     const result = await query(`
       SELECT current_database() AS database_name,
              current_setting('TimeZone') AS db_timezone,
              now() AS db_now,
              count(*)::int AS total_jobs,
-             count(*) FILTER (WHERE created_at >= date_trunc('day', now()))::int AS today_jobs,
+             count(*) FILTER (WHERE created_at >= $1 AND created_at < $2)::int AS today_jobs,
              max(created_at) AS newest_job_at
       FROM jobs
-    `);
+    `, [today.start, today.end]);
     res.json({
       system: {
+        appTimeZone: settings.appTimeZone,
         database: {
           ...databaseTarget(),
           ...result.rows[0]

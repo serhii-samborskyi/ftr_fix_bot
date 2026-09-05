@@ -42,6 +42,25 @@ button {
   padding: 0 16px;
   font-weight: 700;
   cursor: pointer;
+  position: relative;
+}
+
+button:disabled {
+  cursor: progress;
+  opacity: 0.72;
+}
+
+button.is-loading::after {
+  content: "";
+  width: 14px;
+  height: 14px;
+  margin-left: 8px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 999px;
+  display: inline-block;
+  vertical-align: -2px;
+  animation: spin 0.8s linear infinite;
 }
 
 button.secondary {
@@ -135,6 +154,10 @@ button.danger-button,
   margin-bottom: 12px;
 }
 
+.filter-select {
+  margin-bottom: 12px;
+}
+
 .upload-row {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
@@ -213,6 +236,11 @@ textarea {
   font-size: 17px;
 }
 
+.tech-line {
+  color: var(--ink);
+  font-weight: 700;
+}
+
 .job-card-main span,
 .job-card-main small,
 .muted {
@@ -227,6 +255,61 @@ textarea {
 .poster-meta a {
   color: var(--brand);
   font-weight: 800;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.stat-card {
+  display: grid;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.stat-card strong {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.stat-card span,
+.tech-stat-row span,
+.recent-chat small {
+  color: var(--muted);
+}
+
+.tech-stat-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tech-stat-row,
+.recent-chat,
+.technician-row {
+  display: grid;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.tech-stat-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.tech-stat-row strong,
+.recent-chat strong,
+.technician-row strong {
+  overflow-wrap: anywhere;
 }
 
 .job-error {
@@ -394,9 +477,28 @@ textarea {
   margin-bottom: 12px;
 }
 
+.recent-chat-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.recent-chat {
+  width: 100%;
+  min-height: 72px;
+  text-align: left;
+  color: var(--ink);
+}
+
+.recent-chat.active {
+  border-color: var(--brand);
+  box-shadow: inset 3px 0 0 var(--brand);
+}
+
 .conversation {
   display: grid;
   gap: 10px;
+  margin-bottom: 12px;
 }
 
 .bubble {
@@ -419,6 +521,32 @@ textarea {
 
 .bubble small {
   color: var(--muted);
+}
+
+.manual-message-form,
+.tech-form {
+  display: grid;
+  gap: 10px;
+}
+
+.manual-message-form {
+  position: sticky;
+  bottom: 74px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 12px;
+}
+
+.technician-list {
+  display: grid;
+  gap: 8px;
+}
+
+.technician-row {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
 }
 
 .toggle {
@@ -487,12 +615,83 @@ textarea {
   font-weight: 700;
 }
 
+.global-busy {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: var(--shadow);
+}
+
+.global-busy::after {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border: 2px solid #fff;
+  border-right-color: transparent;
+  border-radius: 999px;
+  animation: spin 0.8s linear infinite;
+}
+
+.global-busy.hidden {
+  display: none;
+}
+
+.global-status {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 78px;
+  z-index: 11;
+  max-width: 720px;
+  margin: 0 auto;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--brand);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 10px 12px;
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.global-status.error {
+  border-left-color: var(--danger);
+  color: var(--danger);
+}
+
+.global-status.hidden {
+  display: none;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 760px) {
   .app-shell {
     padding: 14px 12px 86px;
   }
 
   .filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -509,6 +708,11 @@ textarea {
 
   .remove-job-button {
     width: 100%;
+  }
+
+  .tech-stat-row,
+  .technician-row {
+    grid-template-columns: 1fr;
   }
 
   .image-frame img {

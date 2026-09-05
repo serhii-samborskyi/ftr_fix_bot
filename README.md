@@ -48,6 +48,7 @@ Required production variables:
 NODE_ENV=production
 PORT=3000
 APP_BASE_URL=https://your-coolify-domain.example
+APP_TIME_ZONE=America/Chicago
 DATABASE_URL=postgres://USER:PASSWORD@HOST:5432/DB
 DATA_DIR=/app/data
 ADMIN_USERNAME=admin
@@ -62,6 +63,7 @@ PRISMA_BASELINE_EXISTING_DB=true
 ```
 
 The container has a `/healthz` healthcheck and listens on `PORT` or `3000`.
+`APP_TIME_ZONE` controls the Today, Yesterday, Last week, and dashboard date windows. You can also update it later from Settings.
 
 ## Telegram Setup
 

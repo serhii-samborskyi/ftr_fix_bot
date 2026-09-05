@@ -1,6 +1,6 @@
 import express from 'express';
 import { classifyCustomerReply } from '../services/agent.js';
-import { sendBlueBubblesText } from '../services/bluebubbles.js';
+import { getBlueBubblesChatGuid, getBlueBubblesExternalGuid, sendBlueBubblesText } from '../services/bluebubbles.js';
 import { escalateJobConcern } from '../services/escalations.js';
 import { getConversation, getJobByPhoneOrChat, updateOutboundDeliveryFromMessage } from '../services/jobs.js';
 import { getRuntimeSettings } from '../services/settings.js';
@@ -172,6 +172,15 @@ webhookRouter.post('/bluebubbles', verifyBlueBubblesWebhook, async (req, res, ne
       return res.json({ ok: true, matched: true, duplicate: true });
     }
 
+    if (job.aiIgnore) {
+      addWorkerLog('agent', 'info', 'BlueBubbles inbound saved with AI ignored for job', {
+        jobId: job.id,
+        chatGuid: chatGuid || '',
+        sender: sender || ''
+      });
+      return res.json({ ok: true, matched: true, aiIgnored: true });
+    }
+
     const conversation = await getConversation(job.id);
     const settings = await getRuntimeSettings();
     const agentMessageCount = countAgentMessages(conversation);
@@ -185,6 +194,8 @@ webhookRouter.post('/bluebubbles', verifyBlueBubblesWebhook, async (req, res, ne
         chatGuid: chatGuid || job.followupChatGuid,
         message: decision.reply
       });
+      const sentChatGuid = getBlueBubblesChatGuid(sent, chatGuid || job.followupChatGuid || null);
+      const externalGuid = getBlueBubblesExternalGuid(sent);
       await withTransaction(async (client) => {
         await client.query(
           `
@@ -192,7 +203,7 @@ webhookRouter.post('/bluebubbles', verifyBlueBubblesWebhook, async (req, res, ne
             VALUES ($1, 'outbound', $2, $3, $4, $5)
             ON CONFLICT (external_guid) WHERE external_guid IS NOT NULL DO NOTHING
           `,
-          [job.id, decision.reply, sent.data?.guid || null, chatGuid || job.followupChatGuid || null, JSON.stringify(sent)]
+          [job.id, decision.reply, externalGuid || null, sentChatGuid || null, JSON.stringify(sent)]
         );
         await client.query(
           `
@@ -202,13 +213,13 @@ webhookRouter.post('/bluebubbles', verifyBlueBubblesWebhook, async (req, res, ne
                 updated_at = now()
             WHERE id = $1
           `,
-          [job.id, chatGuid || sent.data?.chats?.[0]?.guid || null]
+          [job.id, sentChatGuid || null]
         );
       });
       addWorkerLog('bluebubbles', 'info', 'BlueBubbles webhook reply sent', {
         jobId: job.id,
-        chatGuid: chatGuid || job.followupChatGuid || '',
-        externalGuid: sent.data?.guid || ''
+        chatGuid: sentChatGuid || '',
+        externalGuid: externalGuid || ''
       });
       if (decision.status === 'needs_followup' && agentMessageCount + 1 >= agentMessageLimit) {
         await markReplyLimitReached(job.id, {

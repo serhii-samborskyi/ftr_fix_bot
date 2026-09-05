@@ -37,6 +37,7 @@ model Job {
   ocrText              String?        @map("ocr_text")
   ocrConfidence        Decimal?       @map("ocr_confidence") @db.Decimal
   ocrRaw               Json           @default("{}") @map("ocr_raw")
+  aiIgnore             Boolean        @default(false) @map("ai_ignore")
   followupStatus       String         @default("not_started") @map("followup_status")
   followupChatGuid     String?        @map("followup_chat_guid")
   followupLastError    String?        @map("followup_last_error")
@@ -51,6 +52,18 @@ model Job {
   @@index([status], map: "jobs_status_idx")
   @@index([normalizedPhone], map: "jobs_normalized_phone_idx")
   @@map("jobs")
+}
+
+model Technician {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
+  techId     String   @unique @map("tech_id")
+  telegramId String   @unique @map("telegram_id")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([telegramId], map: "technicians_telegram_id_idx")
+  @@map("technicians")
 }
 
 model Conversation {
