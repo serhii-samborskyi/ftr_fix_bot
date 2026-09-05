@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { getRuntimeSettings } from './settings.js';
 import { normalizePhone, phoneToBlueBubblesChatGuid } from '../utils/phone.js';
-import { redactUrl, serializeError, truncateText } from '../utils/errors.js';
+import { redactUrl, sanitizeMeta, serializeError, truncateText } from '../utils/errors.js';
 
 function baseUrl(url) {
   return String(url || '').replace(/\/+$/, '');
@@ -235,10 +235,14 @@ export function getBlueBubblesSentMessage(result) {
 
 export function getBlueBubblesChatGuid(result, fallback = '') {
   const data = result?.data || result || {};
+  const message = getBlueBubblesSentMessage(result);
   return (
     data?.chats?.[0]?.guid ||
     data?.chat?.guid ||
     data?.chatGuid ||
+    message?.chats?.[0]?.guid ||
+    message?.chat?.guid ||
+    message?.chatGuid ||
     (Array.isArray(data?.messages) ? data?.guid : '') ||
     fallback ||
     ''
@@ -267,7 +271,7 @@ export async function sendBlueBubblesTextAttempt({ attempt, message, allAttempts
     ...result,
     deliveryAttempt: attemptForLog(attempt),
     deliveryAttempts: (allAttempts.length ? allAttempts : [attempt]).map(attemptForLog),
-    deliveryAttemptErrors: previousErrors
+    deliveryAttemptErrors: previousErrors.map((entry) => sanitizeMeta(entry))
   };
 }
 
@@ -294,7 +298,12 @@ export async function sendBlueBubblesText({ phone, chatGuid, message }) {
         error: {
           name: 'BlueBubblesImmediateDeliveryError',
           message: `BlueBubbles returned message error ${errorCode} immediately.`,
-          responseJson: result
+          responseJson: sanitizeMeta({
+            status: result.status,
+            message: result.message,
+            data: result.data,
+            deliveryAttempt: result.deliveryAttempt
+          })
         }
       });
     } catch (error) {

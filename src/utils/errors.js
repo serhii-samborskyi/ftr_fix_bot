@@ -23,21 +23,23 @@ export function redactUrl(value) {
   }
 }
 
-function redactValue(value, key = '', depth = 0) {
+function redactValue(value, key = '', depth = 0, seen = new WeakSet()) {
   if (secretKeyPattern.test(key)) return '<redacted>';
   if (value === null || value === undefined) return value;
   if (typeof value === 'string') return truncateText(redactUrl(value), 2000);
   if (typeof value !== 'object') return value;
   if (depth >= 5) return '[truncated]';
+  if (seen.has(value)) return '[circular]';
+  seen.add(value);
 
   if (Array.isArray(value)) {
-    return value.slice(0, 30).map((item) => redactValue(item, key, depth + 1));
+    return value.slice(0, 30).map((item) => redactValue(item, key, depth + 1, seen));
   }
 
   return Object.fromEntries(
     Object.entries(value)
       .slice(0, 80)
-      .map(([childKey, childValue]) => [childKey, redactValue(childValue, childKey, depth + 1)])
+      .map(([childKey, childValue]) => [childKey, redactValue(childValue, childKey, depth + 1, seen)])
   );
 }
 
