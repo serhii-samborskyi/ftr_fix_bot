@@ -66,6 +66,8 @@ export function toJob(row) {
     customerName: row.customer_name,
     phone: row.phone,
     normalizedPhone: row.normalized_phone,
+    primaryPhone: row.primary_phone,
+    normalizedPrimaryPhone: row.normalized_primary_phone,
     accountNumber: row.account_number,
     address: row.address,
     ocrText: row.ocr_text,
@@ -160,6 +162,7 @@ export async function updateJob(id, payload) {
   const allowed = {
     customerName: 'customer_name',
     phone: 'phone',
+    primaryPhone: 'primary_phone',
     accountNumber: 'account_number',
     address: 'address',
     status: 'status',
@@ -176,6 +179,9 @@ export async function updateJob(id, payload) {
       if (key === 'phone') {
         params.push(normalizePhone(payload[key]));
         assignments.push(`normalized_phone = $${params.length}`);
+      } else if (key === 'primaryPhone') {
+        params.push(normalizePhone(payload[key]));
+        assignments.push(`normalized_primary_phone = $${params.length}`);
       }
     }
   }
@@ -290,14 +296,15 @@ export async function processJobOcr(id) {
   try {
     const extracted = await extractJobFromImage(job.imagePath);
     const normalizedPhone = normalizePhone(extracted.phone);
+    const normalizedPrimaryPhone = normalizePhone(extracted.primaryPhone);
     const missingFields = [
       extracted.customerName ? '' : 'name',
-      normalizedPhone ? '' : 'phone',
+      normalizedPhone || normalizedPrimaryPhone ? '' : 'phone',
       extracted.accountNumber ? '' : 'account number',
       extracted.address ? '' : 'address'
     ].filter(Boolean);
     const hasRequired = !missingFields.length;
-    const canAutoFollowup = Boolean(normalizedPhone);
+    const canAutoFollowup = Boolean(normalizedPhone || normalizedPrimaryPhone);
 
     const result = await query(
       `
@@ -306,11 +313,13 @@ export async function processJobOcr(id) {
             customer_name = $3,
             phone = $4,
             normalized_phone = $5,
-            account_number = $6,
-            address = $7,
-            ocr_text = $8,
-            ocr_confidence = $9,
-            ocr_raw = $10,
+            primary_phone = $6,
+            normalized_primary_phone = $7,
+            account_number = $8,
+            address = $9,
+            ocr_text = $10,
+            ocr_confidence = $11,
+            ocr_raw = $12,
             updated_at = now()
         WHERE id = $1
         RETURNING *
@@ -321,6 +330,8 @@ export async function processJobOcr(id) {
         extracted.customerName || null,
         extracted.phone || null,
         normalizedPhone || null,
+        extracted.primaryPhone || null,
+        normalizedPrimaryPhone || null,
         extracted.accountNumber || null,
         extracted.address || null,
         extracted.ocrText || '',
@@ -336,7 +347,8 @@ export async function processJobOcr(id) {
         addWorkerLog('followup', 'warn', 'Auto follow-up continuing with incomplete OCR', {
           jobId: processed.id,
           missingFields: missingFields.join(', '),
-          phone: processed.normalizedPhone || processed.phone || ''
+          phone: processed.normalizedPhone || processed.phone || '',
+          primaryPhone: processed.normalizedPrimaryPhone || processed.primaryPhone || ''
         });
       }
       try {
@@ -490,10 +502,12 @@ async function applyDeliveryUpdate({ conversation, message, raw, source }) {
         UPDATE jobs
         SET followup_status = CASE
               WHEN followup_status IN ('concern', 'satisfied', 'limit_reached') THEN followup_status
+              WHEN followup_status = 'sent' AND $2 IN ('delivery_pending', 'delivery_failed', 'failed') THEN followup_status
               ELSE $2
             END,
             followup_last_error = CASE
               WHEN followup_status IN ('concern', 'satisfied', 'limit_reached') THEN followup_last_error
+              WHEN followup_status = 'sent' AND $2 IN ('delivery_pending', 'delivery_failed', 'failed') THEN followup_last_error
               ELSE $3
             END,
             followup_chat_guid = COALESCE($4, followup_chat_guid),
@@ -638,10 +652,12 @@ async function sendFallbackAttempt(conversation, failedDelivery) {
         UPDATE jobs
         SET followup_status = CASE
               WHEN followup_status IN ('concern', 'satisfied', 'limit_reached') THEN followup_status
+              WHEN followup_status = 'sent' AND $2 IN ('delivery_pending', 'delivery_failed', 'failed') THEN followup_status
               ELSE $2
             END,
             followup_last_error = CASE
               WHEN followup_status IN ('concern', 'satisfied', 'limit_reached') THEN followup_last_error
+              WHEN followup_status = 'sent' AND $2 IN ('delivery_pending', 'delivery_failed', 'failed') THEN followup_last_error
               ELSE $3
             END,
             followup_chat_guid = COALESCE($4, followup_chat_guid),
@@ -694,31 +710,115 @@ function scheduleDeliveryFallback(conversation, failedDelivery) {
   timer.unref?.();
 }
 
+export function jobContactPhoneTargets(job) {
+  const candidates = [
+    {
+      label: 'Call First',
+      phone: normalizePhone(job?.normalizedPhone || job?.phone),
+      displayPhone: job?.phone || job?.normalizedPhone || ''
+    },
+    {
+      label: 'Primary',
+      phone: normalizePhone(job?.normalizedPrimaryPhone || job?.primaryPhone),
+      displayPhone: job?.primaryPhone || job?.normalizedPrimaryPhone || ''
+    }
+  ];
+  const seen = new Set();
+
+  return candidates.filter((candidate) => {
+    if (!/^\+\d{8,15}$/.test(candidate.phone)) return false;
+    if (seen.has(candidate.phone)) return false;
+    seen.add(candidate.phone);
+    return true;
+  });
+}
+
 export async function sendInitialFollowup(id) {
   const job = await getJob(id);
   if (!job) throw new Error('Job not found');
-  const targetPhone = job.normalizedPhone || job.phone;
-  if (!targetPhone) throw new Error('Job has no phone number.');
+  const targets = jobContactPhoneTargets(job);
+  if (!targets.length) throw new Error('Job has no phone number.');
 
   const message = await buildInitialFollowup(job);
   const settings = await getRuntimeSettings();
-  const attempts = buildBlueBubblesTextAttempts({ phone: targetPhone }, settings);
-  const firstAttempt = attempts[0] || {};
+  const outcomes = [];
+  const errors = [];
 
-  try {
+  for (const target of targets) {
+    const attempts = buildBlueBubblesTextAttempts({ phone: target.phone }, settings);
+    const firstAttempt = attempts[0] || {};
     addWorkerLog('followup', 'info', 'Sending BlueBubbles follow-up', {
       jobId: job.id,
       customerName: job.customerName || '',
-      phone: targetPhone || '',
+      targetLabel: target.label,
+      phone: target.phone,
       firstAttempt: firstAttempt.label || '',
       chatGuid: firstAttempt.chatGuid || '',
       attemptCount: String(attempts.length)
     });
-    const sent = await sendBlueBubblesText({ phone: targetPhone, message });
-    const sentMessage = sentMessageFromResult(sent);
-    const chatGuid = getBlueBubblesChatGuid(sent);
-    const externalGuid = getBlueBubblesExternalGuid(sent);
-    const delivery = deliveryStateFromBlueBubblesMessage(sentMessage, externalGuid, chatGuid);
+
+    try {
+      const sent = await sendBlueBubblesText({ phone: target.phone, message });
+      const sentMessage = sentMessageFromResult(sent);
+      const chatGuid = getBlueBubblesChatGuid(sent);
+      const externalGuid = getBlueBubblesExternalGuid(sent);
+      const delivery = deliveryStateFromBlueBubblesMessage(sentMessage, externalGuid, chatGuid);
+      const raw = {
+        ...sent,
+        targetLabel: target.label,
+        targetPhone: target.phone
+      };
+
+      await query(
+        `
+          INSERT INTO conversations(job_id, direction, body, external_guid, external_chat_guid, raw)
+          VALUES ($1, 'outbound', $2, $3, $4, $5)
+          ON CONFLICT (external_guid) WHERE external_guid IS NOT NULL DO NOTHING
+        `,
+        [id, message, externalGuid, chatGuid, JSON.stringify(raw)]
+      );
+      outcomes.push({ target, sent, delivery });
+      addWorkerLog('followup', 'info', 'BlueBubbles follow-up accepted', {
+        jobId: job.id,
+        targetLabel: target.label,
+        phone: target.phone,
+        chatGuid: chatGuid || '',
+        externalGuid: externalGuid || '',
+        attempt: sent.deliveryAttempt?.label || '',
+        method: sent.deliveryAttempt?.method || '',
+        previousFailedAttempts: String(sent.deliveryAttemptErrors?.length || 0),
+        followupStatus: delivery.followupStatus,
+        isDelivered: String(Boolean(delivery.isDelivered)),
+        errorCode: delivery.errorCode || ''
+      });
+      if (delivery.followupStatus === 'delivery_pending') scheduleDeliveryChecks(job.id, externalGuid);
+    } catch (error) {
+      errors.push({ target, error });
+      addWorkerLog('followup', 'error', 'BlueBubbles follow-up target failed', errorToLogMeta(error, {
+        jobId: job.id,
+        targetLabel: target.label,
+        phone: target.phone
+      }));
+    }
+  }
+
+  const accepted = outcomes.filter((outcome) => outcome.delivery.followupStatus !== 'delivery_failed');
+  const finalStatus = accepted.some((outcome) => outcome.delivery.followupStatus === 'sent')
+    ? 'sent'
+    : accepted.some((outcome) => outcome.delivery.followupStatus === 'delivery_pending')
+      ? 'delivery_pending'
+      : 'failed';
+  const firstChatGuid = accepted[0]?.delivery.chatGuid || outcomes[0]?.delivery.chatGuid || null;
+  const errorMessage = errors.length
+    ? truncateText(
+        errors
+          .map((entry) => `${entry.target.label} ${entry.target.phone}: ${errorToStoredMessage(entry.error, 350)}`)
+          .join(' | '),
+        1000
+      )
+    : null;
+
+  try {
     await withTransaction(async (client) => {
       await client.query(
         `
@@ -731,29 +831,19 @@ export async function sendInitialFollowup(id) {
               updated_at = now()
           WHERE id = $1
         `,
-        [id, chatGuid, delivery.followupStatus, delivery.followupLastError]
-      );
-      await client.query(
-        `
-          INSERT INTO conversations(job_id, direction, body, external_guid, external_chat_guid, raw)
-          VALUES ($1, 'outbound', $2, $3, $4, $5)
-          ON CONFLICT (external_guid) WHERE external_guid IS NOT NULL DO NOTHING
-        `,
-        [id, message, externalGuid, chatGuid, JSON.stringify(sent)]
+        [id, firstChatGuid, finalStatus, finalStatus === 'failed' ? errorMessage || 'All follow-up target sends failed.' : errorMessage]
       );
     });
-    addWorkerLog('followup', 'info', 'BlueBubbles follow-up accepted', {
-      jobId: job.id,
-      chatGuid: chatGuid || '',
-      externalGuid: externalGuid || '',
-      attempt: sent.deliveryAttempt?.label || '',
-      method: sent.deliveryAttempt?.method || '',
-      previousFailedAttempts: String(sent.deliveryAttemptErrors?.length || 0),
-      followupStatus: delivery.followupStatus,
-      isDelivered: String(Boolean(delivery.isDelivered)),
-      errorCode: delivery.errorCode || ''
-    });
-    if (delivery.followupStatus === 'delivery_pending') scheduleDeliveryChecks(job.id, externalGuid);
+
+    if (finalStatus === 'failed') {
+      const error = new Error(errorMessage || 'All follow-up target sends failed.');
+      addWorkerLog('followup', 'error', 'BlueBubbles follow-up failed for every target', errorToLogMeta(error, {
+        jobId: job.id,
+        targetCount: String(targets.length)
+      }));
+      throw error;
+    }
+
     return getJob(id);
   } catch (error) {
     const storedError = errorToStoredMessage(error);
@@ -778,7 +868,7 @@ export async function sendManualJobMessage(id, message) {
 
   const job = await getJob(id);
   if (!job) throw new Error('Job not found');
-  const targetPhone = job.normalizedPhone || job.phone;
+  const targetPhone = jobContactPhoneTargets(job)[0]?.phone || '';
   if (!targetPhone && !job.followupChatGuid) throw new Error('Job has no phone number or BlueBubbles chat GUID.');
 
   const sent = await sendBlueBubblesText({
@@ -802,11 +892,13 @@ export async function sendManualJobMessage(id, message) {
         SET status = CASE WHEN status IN ('ocr_ready', 'received', 'needs_review') THEN 'contacted' ELSE status END,
             followup_status = CASE
               WHEN followup_status IN ('concern', 'satisfied', 'limit_reached') THEN followup_status
+              WHEN followup_status = 'sent' AND $3 IN ('delivery_pending', 'delivery_failed', 'failed') THEN followup_status
               ELSE $3
             END,
             followup_chat_guid = COALESCE($2, followup_chat_guid),
             followup_last_error = CASE
               WHEN followup_status IN ('concern', 'satisfied', 'limit_reached') THEN followup_last_error
+              WHEN followup_status = 'sent' AND $3 IN ('delivery_pending', 'delivery_failed', 'failed') THEN followup_last_error
               ELSE $4
             END,
             last_contact_at = now(),
@@ -974,7 +1066,7 @@ export async function getJobByPhoneOrChat({ phone, chatGuid }) {
 
   if (normalized) {
     params.push(normalized);
-    clauses.push(`jobs.normalized_phone = $${params.length}`);
+    clauses.push(`(jobs.normalized_phone = $${params.length} OR jobs.normalized_primary_phone = $${params.length})`);
   }
   if (chatGuid) {
     params.push(chatGuid);

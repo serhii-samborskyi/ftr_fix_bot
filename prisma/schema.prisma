@@ -16,41 +16,44 @@ model Setting {
 }
 
 model Job {
-  id                   String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  source               String         @default("telegram")
-  sourceChatId         String?        @map("source_chat_id")
-  sourceChatTitle      String?        @map("source_chat_title")
-  sourceMessageId      String?        @map("source_message_id")
-  sourceSenderId       String?        @map("source_sender_id")
-  sourceSenderUsername String?        @map("source_sender_username")
-  sourceSenderName     String?        @map("source_sender_name")
-  sourceSenderIsBot    Boolean?       @map("source_sender_is_bot")
-  telegramFileId       String?        @map("telegram_file_id")
-  imagePath            String         @map("image_path")
-  imageMime            String?        @map("image_mime")
-  status               String         @default("received")
-  customerName         String?        @map("customer_name")
-  phone                String?
-  normalizedPhone      String?        @map("normalized_phone")
-  accountNumber        String?        @map("account_number")
-  address              String?
-  ocrText              String?        @map("ocr_text")
-  ocrConfidence        Decimal?       @map("ocr_confidence") @db.Decimal
-  ocrRaw               Json           @default("{}") @map("ocr_raw")
-  aiIgnore             Boolean        @default(false) @map("ai_ignore")
-  followupStatus       String         @default("not_started") @map("followup_status")
-  followupChatGuid     String?        @map("followup_chat_guid")
-  followupLastError    String?        @map("followup_last_error")
-  escalatedAt          DateTime?      @map("escalated_at") @db.Timestamptz(6)
-  lastContactAt        DateTime?      @map("last_contact_at") @db.Timestamptz(6)
-  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt            DateTime       @default(now()) @map("updated_at") @db.Timestamptz(6)
-  conversations        Conversation[]
-  escalations          Escalation[]
+  id                     String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  source                 String         @default("telegram")
+  sourceChatId           String?        @map("source_chat_id")
+  sourceChatTitle        String?        @map("source_chat_title")
+  sourceMessageId        String?        @map("source_message_id")
+  sourceSenderId         String?        @map("source_sender_id")
+  sourceSenderUsername   String?        @map("source_sender_username")
+  sourceSenderName       String?        @map("source_sender_name")
+  sourceSenderIsBot      Boolean?       @map("source_sender_is_bot")
+  telegramFileId         String?        @map("telegram_file_id")
+  imagePath              String         @map("image_path")
+  imageMime              String?        @map("image_mime")
+  status                 String         @default("received")
+  customerName           String?        @map("customer_name")
+  phone                  String?
+  normalizedPhone        String?        @map("normalized_phone")
+  primaryPhone           String?        @map("primary_phone")
+  normalizedPrimaryPhone String?        @map("normalized_primary_phone")
+  accountNumber          String?        @map("account_number")
+  address                String?
+  ocrText                String?        @map("ocr_text")
+  ocrConfidence          Decimal?       @map("ocr_confidence") @db.Decimal
+  ocrRaw                 Json           @default("{}") @map("ocr_raw")
+  aiIgnore               Boolean        @default(false) @map("ai_ignore")
+  followupStatus         String         @default("not_started") @map("followup_status")
+  followupChatGuid       String?        @map("followup_chat_guid")
+  followupLastError      String?        @map("followup_last_error")
+  escalatedAt            DateTime?      @map("escalated_at") @db.Timestamptz(6)
+  lastContactAt          DateTime?      @map("last_contact_at") @db.Timestamptz(6)
+  createdAt              DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime       @default(now()) @map("updated_at") @db.Timestamptz(6)
+  conversations          Conversation[]
+  escalations            Escalation[]
 
   @@index([createdAt], map: "jobs_created_at_idx")
   @@index([status], map: "jobs_status_idx")
   @@index([normalizedPhone], map: "jobs_normalized_phone_idx")
+  @@index([normalizedPrimaryPhone], map: "jobs_normalized_primary_phone_idx")
   @@map("jobs")
 }
 

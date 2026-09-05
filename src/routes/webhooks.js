@@ -190,7 +190,7 @@ webhookRouter.post('/bluebubbles', verifyBlueBubblesWebhook, async (req, res, ne
 
     if (decision.reply && canSendReply) {
       const sent = await sendBlueBubblesText({
-        phone: job.normalizedPhone || job.phone,
+        phone: sender || job.normalizedPhone || job.phone || job.normalizedPrimaryPhone || job.primaryPhone,
         chatGuid: chatGuid || job.followupChatGuid,
         message: decision.reply
       });

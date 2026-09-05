@@ -20,6 +20,7 @@ const defaults = {
     `Customer concern detected
 Name: {{name}}
 Phone: {{phone}}
+Primary phone: {{primaryPhone}}
 Account #: {{accountNumber}}
 Address: {{address}}
 Technician: {{tech}}

@@ -80,6 +80,7 @@ function renderTemplate(template, job) {
     .replaceAll('{{name}}', job.customer_name || job.customerName || 'there')
     .replaceAll('{{tech}}', job.techName || job.tech_name || 'your technician')
     .replaceAll('{{address}}', job.address || 'your address')
+    .replaceAll('{{primaryPhone}}', job.primaryPhone || job.primary_phone || '')
     .replaceAll('{{accountNumber}}', job.account_number || job.accountNumber || '')
     .replace(/\s+/g, ' ')
     .trim();
@@ -337,6 +338,7 @@ export async function buildInitialFollowup(job) {
         content: `Write one short initial SMS follow-up for this customer. No JSON.
 Customer name: ${jobValue(job, 'customerName', 'customer_name') || 'there'}
 Phone: ${jobValue(job, 'phone')}
+Primary phone: ${jobValue(job, 'primaryPhone', 'primary_phone')}
 Account: ${jobValue(job, 'accountNumber', 'account_number')}
 Address: ${jobValue(job, 'address') || 'the service address'}
 Technician: ${jobValue(job, 'techName', 'tech_name') || 'the technician'}
@@ -376,6 +378,7 @@ export async function classifyCustomerReply({ job, conversation, customerText })
           content: `Customer/job context:
 Name: ${jobValue(job, 'customerName', 'customer_name')}
 Phone: ${job.phone || ''}
+Primary phone: ${jobValue(job, 'primaryPhone', 'primary_phone') || ''}
 Account: ${jobValue(job, 'accountNumber', 'account_number')}
 Address: ${job.address || ''}
 

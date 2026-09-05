@@ -66,7 +66,41 @@ function extractPhones(text) {
   const matches = [
     ...text.matchAll(/(?:\+?1[\s.-]*)?(?:\(?\d{3}\)?[\s.-]*)\d{3}[\s.-]*\d{4}/g)
   ].map((match) => match[0]);
-  return [...new Set(matches)].map((phone) => normalizePhone(phone)).filter(Boolean);
+  return [...new Set(matches.map((phone) => normalizePhone(phone)).filter(Boolean))];
+}
+
+function findLabeledPhone(label, lines, text) {
+  const labelPattern = new RegExp(`\\b${label}\\b`, 'i');
+  const phonePattern = /(?:\+?1[\s.-]*)?(?:\(?\d{3}\)?[\s.-]*)\d{3}[\s.-]*\d{4}/;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (!labelPattern.test(line)) continue;
+
+    const sameLine = line.match(phonePattern);
+    if (sameLine) return normalizePhone(sameLine[0]);
+
+    for (const nearby of [lines[index + 1], lines[index + 2]]) {
+      const match = nearby?.match(phonePattern);
+      if (match) return normalizePhone(match[0]);
+    }
+  }
+
+  const textMatch = text.match(new RegExp(`\\b${label}\\b[\\s\\S]{0,90}?(${phonePattern.source})`, 'i'));
+  return textMatch ? normalizePhone(textMatch[1]) : '';
+}
+
+function extractPhoneDetails(lines, text) {
+  const phones = extractPhones(text);
+  const callFirstPhone = findLabeledPhone('Call\\s+First', lines, text);
+  const primaryPhone = findLabeledPhone('Primary', lines, text);
+  const contactPhone = callFirstPhone || primaryPhone || phones[0] || '';
+
+  return {
+    phone: contactPhone,
+    primaryPhone: primaryPhone || '',
+    phones
+  };
 }
 
 function extractName(lines, text) {
@@ -118,18 +152,15 @@ export function parseJobFields(text) {
     .map(cleanLine)
     .filter(Boolean);
 
-  const phones = extractPhones(normalized);
-  const contactPhone =
-    phones.find((phone) => {
-      const line = lines.find((candidate) => candidate.includes(phone.slice(-4)));
-      return line && /Call First|Primary/i.test(line);
-    }) || phones[0] || '';
+  const phoneDetails = extractPhoneDetails(lines, normalized);
 
   return {
     customerName: extractName(lines, normalized),
-    phone: contactPhone,
+    phone: phoneDetails.phone,
+    primaryPhone: phoneDetails.primaryPhone,
     accountNumber: extractAccount(normalized),
-    address: extractAddress(lines)
+    address: extractAddress(lines),
+    phones: phoneDetails.phones
   };
 }
 
@@ -167,7 +198,7 @@ export async function extractJobFromImage(imagePath) {
       ...parsed,
       ocrText: text,
       ocrConfidence: confidence,
-      raw: { crops: recognized }
+      raw: { crops: recognized, parsed }
     };
   } finally {
     await worker.terminate();

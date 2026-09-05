@@ -126,6 +126,7 @@ apiRouter.patch('/jobs/:id', async (req, res, next) => {
     const schema = z.object({
       customerName: z.string().optional(),
       phone: z.string().optional(),
+      primaryPhone: z.string().optional(),
       accountNumber: z.string().optional(),
       address: z.string().optional(),
       status: z.string().optional(),

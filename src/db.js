@@ -59,6 +59,8 @@ export async function runMigrations() {
       customer_name text,
       phone text,
       normalized_phone text,
+      primary_phone text,
+      normalized_primary_phone text,
       account_number text,
       address text,
       ocr_text text,
@@ -79,6 +81,8 @@ export async function runMigrations() {
   await query('ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source_sender_name text');
   await query('ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source_sender_is_bot boolean');
   await query('ALTER TABLE jobs ADD COLUMN IF NOT EXISTS ai_ignore boolean NOT NULL DEFAULT false');
+  await query('ALTER TABLE jobs ADD COLUMN IF NOT EXISTS primary_phone text');
+  await query('ALTER TABLE jobs ADD COLUMN IF NOT EXISTS normalized_primary_phone text');
 
   await query(`
     CREATE UNIQUE INDEX IF NOT EXISTS jobs_source_message_uidx
@@ -88,6 +92,7 @@ export async function runMigrations() {
   await query('CREATE INDEX IF NOT EXISTS jobs_created_at_idx ON jobs(created_at DESC)');
   await query('CREATE INDEX IF NOT EXISTS jobs_status_idx ON jobs(status)');
   await query('CREATE INDEX IF NOT EXISTS jobs_normalized_phone_idx ON jobs(normalized_phone)');
+  await query('CREATE INDEX IF NOT EXISTS jobs_normalized_primary_phone_idx ON jobs(normalized_primary_phone)');
 
   await query(`
     CREATE TABLE IF NOT EXISTS conversations (

@@ -97,7 +97,7 @@ Enable at least the `new-message` event.
 
 Settings can also send concern summaries to managers/supervisors through BlueBubbles. Enable `BlueBubbles manager escalation`, add one or more phone numbers separated by commas or new lines, and edit the escalation SMS template.
 
-Template macros: `{{name}}`, `{{phone}}`, `{{accountNumber}}`, `{{address}}`, `{{tech}}`, `{{techId}}`, `{{techTelegramId}}`, `{{telegramPoster}}`, `{{concern}}`, `{{jobId}}`.
+Template macros: `{{name}}`, `{{phone}}`, `{{primaryPhone}}`, `{{accountNumber}}`, `{{address}}`, `{{tech}}`, `{{techId}}`, `{{techTelegramId}}`, `{{telegramPoster}}`, `{{concern}}`, `{{jobId}}`.
 
 ## Security
 

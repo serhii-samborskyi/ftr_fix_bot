@@ -132,6 +132,16 @@ function techLabel(job) {
   return 'Unmatched';
 }
 
+function phoneSummary(job) {
+  const phones = [];
+  if (job.phone) phones.push(`Call First ${job.phone}`);
+  const sameNumber =
+    job.primaryPhone === job.phone ||
+    (job.normalizedPrimaryPhone && job.normalizedPhone && job.normalizedPrimaryPhone === job.normalizedPhone);
+  if (job.primaryPhone && !sameNumber) phones.push(`Primary ${job.primaryPhone}`);
+  return phones.join(' / ') || 'No phone';
+}
+
 function renderStats(stats) {
   const summary = stats?.summary || {};
   const cards = [
@@ -206,7 +216,7 @@ function renderJobs() {
           <button class="job-card-main" data-open-job-id="${job.id}">
             <span class="badge ${statusClass(job)}">${escapeHtml(job.status)}</span>
             <strong>${escapeHtml(job.customerName || 'Unknown customer')}</strong>
-            <span>${escapeHtml(job.phone || 'No phone')} - ${escapeHtml(job.accountNumber || 'No account')}</span>
+            <span>${escapeHtml(phoneSummary(job))} - ${escapeHtml(job.accountNumber || 'No account')}</span>
             <span>${escapeHtml(job.address || 'No address')}</span>
             <small class="tech-line">Tech: ${escapeHtml(techLabel(job))}${job.aiIgnore ? ' - AI ignored' : ''}</small>
             <small>${formatDate(job.createdAt)} - follow-up: ${escapeHtml(job.followupStatus)}</small>
@@ -277,6 +287,7 @@ function fillJobForm(job) {
   $('#jobId').value = job.id;
   $('#customerName').value = job.customerName || '';
   $('#phone').value = job.phone || '';
+  $('#primaryPhone').value = job.primaryPhone || '';
   $('#accountNumber').value = job.accountNumber || '';
   $('#address').value = job.address || '';
   $('#reviewAiIgnore').checked = Boolean(job.aiIgnore);
@@ -285,7 +296,7 @@ function fillJobForm(job) {
   $('#jobTechMeta').textContent = `Technician: ${techLabel(job)}${job.techTelegramId ? ` - Telegram ${job.techTelegramId}` : ''}`;
   $('#jobError').textContent = job.followupLastError ? `Follow-up error: ${job.followupLastError}` : '';
   $('#jobError').classList.toggle('hidden', !job.followupLastError);
-  $('#conversationHeader').textContent = `${job.customerName || 'Unknown customer'} - ${job.phone || 'No phone'} - ${techLabel(job)}`;
+  $('#conversationHeader').textContent = `${job.customerName || 'Unknown customer'} - ${phoneSummary(job)} - ${techLabel(job)}`;
   const posterMeta = renderTelegramPosterMeta(job);
   $('#sourcePosterMeta').innerHTML = posterMeta;
   $('#sourcePosterMeta').classList.toggle('hidden', !posterMeta);
@@ -297,6 +308,7 @@ function clearSelectedJob() {
   $('#jobId').value = '';
   $('#customerName').value = '';
   $('#phone').value = '';
+  $('#primaryPhone').value = '';
   $('#accountNumber').value = '';
   $('#address').value = '';
   $('#reviewAiIgnore').checked = false;
@@ -359,7 +371,7 @@ function renderRecentConversations(items = []) {
       const active = state.selectedJob?.id === job.id ? 'active' : '';
       return `
         <button class="recent-chat ${active}" data-chat-job-id="${job.id}">
-          <strong>${escapeHtml(job.customerName || 'Unknown customer')} - ${escapeHtml(job.phone || 'No phone')}</strong>
+          <strong>${escapeHtml(job.customerName || 'Unknown customer')} - ${escapeHtml(phoneSummary(job))}</strong>
           <span>${escapeHtml(lastMessage?.body || '')}</span>
           <small>${formatDate(lastMessage?.createdAt)} - ${escapeHtml(techLabel(job))}${job.aiIgnore ? ' - AI ignored' : ''}</small>
         </button>
@@ -725,6 +737,7 @@ function wireEvents() {
       const payload = {
         customerName: $('#customerName').value,
         phone: $('#phone').value,
+        primaryPhone: $('#primaryPhone').value,
         accountNumber: $('#accountNumber').value,
         address: $('#address').value,
         aiIgnore: $('#reviewAiIgnore').checked

@@ -32,6 +32,7 @@ function managerMessage(job, reason) {
     '',
     `Name: ${jobValue(job, 'customerName', 'customer_name') || 'Unknown'}`,
     `Phone: ${jobValue(job, 'phone') || jobValue(job, 'normalizedPhone', 'normalized_phone') || 'Unknown'}`,
+    `Primary phone: ${jobValue(job, 'primaryPhone', 'primary_phone') || jobValue(job, 'normalizedPrimaryPhone', 'normalized_primary_phone') || 'Unknown'}`,
     `Account #: ${jobValue(job, 'accountNumber', 'account_number') || 'Unknown'}`,
     `Address: ${jobValue(job, 'address') || 'Unknown'}`,
     `Technician: ${jobValue(job, 'techName', 'tech_name') || 'Unmatched'}`,
@@ -58,6 +59,7 @@ export function renderBlueBubblesEscalationMessage(template, job, reason) {
   const values = {
     name: jobValue(job, 'customerName', 'customer_name') || 'Unknown',
     phone: jobValue(job, 'phone') || jobValue(job, 'normalizedPhone', 'normalized_phone') || 'Unknown',
+    primaryPhone: jobValue(job, 'primaryPhone', 'primary_phone') || jobValue(job, 'normalizedPrimaryPhone', 'normalized_primary_phone') || '',
     accountNumber: jobValue(job, 'accountNumber', 'account_number') || 'Unknown',
     address: jobValue(job, 'address') || 'Unknown',
     tech: jobValue(job, 'techName', 'tech_name') || 'Unmatched',
