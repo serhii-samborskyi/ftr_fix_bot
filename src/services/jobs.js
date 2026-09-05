@@ -31,7 +31,21 @@ const jobSelect = `
   tech.telegram_id AS tech_telegram_id
 `;
 
-const jobTechJoin = 'LEFT JOIN technicians tech ON tech.telegram_id = jobs.source_sender_id';
+const jobTechJoin = `
+  LEFT JOIN LATERAL (
+    SELECT technicians.*
+    FROM technicians
+    WHERE technicians.telegram_id = jobs.source_sender_id
+       OR (
+         jobs.source_sender_username IS NOT NULL
+         AND jobs.source_sender_username <> ''
+         AND lower(regexp_replace(technicians.telegram_id, '^@+', '')) = lower(regexp_replace(jobs.source_sender_username, '^@+', ''))
+       )
+    ORDER BY CASE WHEN technicians.telegram_id = jobs.source_sender_id THEN 0 ELSE 1 END,
+             technicians.updated_at DESC
+    LIMIT 1
+  ) tech ON true
+`;
 
 export function toJob(row) {
   if (!row) return null;

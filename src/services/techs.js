@@ -2,11 +2,23 @@ import { query } from '../db.js';
 
 export const unmatchedTechFilter = 'unmatched';
 
+export function normalizeTelegramContact(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^-?\d+$/.test(raw)) return raw;
+
+  const linkMatch = raw.match(/^(?:https?:\/\/)?t\.me\/([a-zA-Z0-9_]{5,})(?:[/?#].*)?$/i);
+  const username = linkMatch?.[1] || raw.replace(/^@+/, '');
+  if (/^[a-zA-Z0-9_]{5,}$/.test(username)) return `@${username.toLowerCase()}`;
+
+  return raw;
+}
+
 function normalizeTechPayload(payload = {}) {
   return {
     name: String(payload.name || '').trim(),
     techId: String(payload.techId || payload.tech_id || '').trim(),
-    telegramId: String(payload.telegramId || payload.telegram_id || '').trim()
+    telegramId: normalizeTelegramContact(payload.telegramId || payload.telegram_id)
   };
 }
 
