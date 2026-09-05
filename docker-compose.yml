@@ -10,6 +10,7 @@ services:
       DATABASE_URL: postgres://ftr:ftr@postgres:5432/ftr_fix_bot
       APP_TIME_ZONE: America/Chicago
       DATA_DIR: /app/data
+      BLUEBUBBLES_ESCALATION_ENABLED: "false"
       SKIP_PRISMA_MIGRATE: "false"
     volumes:
       - ftr-data:/app/data

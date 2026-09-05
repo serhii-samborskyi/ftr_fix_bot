@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FTR Fix Bot</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/assets/styles.css?v=20260905-tech-chat-stats" />
+    <link rel="stylesheet" href="/assets/styles.css?v=20260905-bb-escalations" />
   </head>
   <body>
     <div class="app-shell">
@@ -147,6 +147,9 @@
             <label>BlueBubbles send method <input id="bluebubblesSendMethod" placeholder="private-api" /></label>
             <label>BlueBubbles service order <input id="bluebubblesServiceOrder" placeholder="iMessage,SMS" /></label>
             <label class="toggle"><input type="checkbox" id="bluebubblesAddressFallback" /> Address fallback</label>
+            <label class="toggle"><input type="checkbox" id="bluebubblesEscalationEnabled" /> BlueBubbles manager escalation</label>
+            <label>Manager/supervisor phones <textarea id="bluebubblesEscalationPhones" rows="3" placeholder="+17731234567, +17739876543"></textarea></label>
+            <label>Escalation SMS template <textarea id="bluebubblesEscalationTemplate" rows="8"></textarea></label>
             <div class="copy-row">
               <label>BlueBubbles webhook URL <input id="bluebubblesWebhookUrl" readonly /></label>
               <button type="button" class="secondary" id="copyWebhookUrlBtn">Copy</button>
@@ -185,6 +188,6 @@
     </div>
     <div class="global-busy hidden" id="globalBusy">Working</div>
     <div class="global-status hidden" id="globalStatus"></div>
-    <script src="/assets/app.js?v=20260905-tech-chat-stats"></script>
+    <script src="/assets/app.js?v=20260905-bb-escalations"></script>
   </body>
 </html>

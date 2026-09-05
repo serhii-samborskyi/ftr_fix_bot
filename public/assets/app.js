@@ -484,6 +484,8 @@ async function loadSettings() {
     'bluebubblesServerUrl',
     'bluebubblesSendMethod',
     'bluebubblesServiceOrder',
+    'bluebubblesEscalationPhones',
+    'bluebubblesEscalationTemplate',
     'bluebubblesWebhookUrl',
     'llmProvider',
     'ollamaBaseUrl',
@@ -499,8 +501,14 @@ async function loadSettings() {
   }
   $('#telegramAckEnabled').checked = Boolean(settings.telegramAckEnabled);
   $('#bluebubblesAddressFallback').checked = Boolean(settings.bluebubblesAddressFallback);
+  $('#bluebubblesEscalationEnabled').checked = Boolean(settings.bluebubblesEscalationEnabled);
   $('#autoSendFollowup').checked = Boolean(settings.autoSendFollowup);
-  $('#settingsStatus').textContent = `Telegram token: ${settings.telegramBotTokenConfigured ? 'configured' : 'missing'} - BlueBubbles password: ${settings.bluebubblesPasswordConfigured ? 'configured' : 'missing'} - Gemini key: ${settings.geminiApiKeyConfigured ? 'configured' : 'missing'}`;
+  $('#settingsStatus').textContent = [
+    `Telegram token: ${settings.telegramBotTokenConfigured ? 'configured' : 'missing'}`,
+    `BlueBubbles password: ${settings.bluebubblesPasswordConfigured ? 'configured' : 'missing'}`,
+    `manager SMS: ${settings.bluebubblesEscalationEnabled ? 'enabled' : 'disabled'}`,
+    `Gemini key: ${settings.geminiApiKeyConfigured ? 'configured' : 'missing'}`
+  ].join(' - ');
   await loadSystemStatus();
   await loadWorkerStatus();
 }
@@ -617,6 +625,8 @@ function collectSettings(formType) {
           'bluebubblesWebhookSecret',
           'bluebubblesSendMethod',
           'bluebubblesServiceOrder',
+          'bluebubblesEscalationPhones',
+          'bluebubblesEscalationTemplate',
           'llmProvider',
           'ollamaBaseUrl',
           'ollamaModel',
@@ -635,6 +645,7 @@ function collectSettings(formType) {
   if (formType !== 'prompt') {
     payload.telegramAckEnabled = $('#telegramAckEnabled').checked;
     payload.bluebubblesAddressFallback = $('#bluebubblesAddressFallback').checked;
+    payload.bluebubblesEscalationEnabled = $('#bluebubblesEscalationEnabled').checked;
     payload.autoSendFollowup = $('#autoSendFollowup').checked;
   }
   return payload;

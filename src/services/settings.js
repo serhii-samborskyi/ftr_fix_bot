@@ -13,6 +13,17 @@ const defaults = {
   bluebubblesSendMethod: config.bluebubbles.sendMethod,
   bluebubblesServiceOrder: config.bluebubbles.serviceOrder,
   bluebubblesAddressFallback: String(config.bluebubbles.addressFallback),
+  bluebubblesEscalationEnabled: String(config.bluebubbles.escalationEnabled),
+  bluebubblesEscalationPhones: config.bluebubbles.escalationPhones,
+  bluebubblesEscalationTemplate:
+    config.bluebubbles.escalationTemplate ||
+    `Customer concern detected
+Name: {{name}}
+Phone: {{phone}}
+Account #: {{accountNumber}}
+Address: {{address}}
+Technician: {{tech}}
+Concern: {{concern}}`,
   llmProvider: config.llm.provider,
   ollamaBaseUrl: config.llm.ollamaBaseUrl,
   ollamaModel: config.llm.ollamaModel,
@@ -107,6 +118,9 @@ export async function getRuntimeSettings() {
     bluebubblesSendMethod: merged.bluebubblesSendMethod,
     bluebubblesServiceOrder: merged.bluebubblesServiceOrder,
     bluebubblesAddressFallback: parseBool(merged.bluebubblesAddressFallback, true),
+    bluebubblesEscalationEnabled: parseBool(merged.bluebubblesEscalationEnabled, false),
+    bluebubblesEscalationPhones: merged.bluebubblesEscalationPhones,
+    bluebubblesEscalationTemplate: merged.bluebubblesEscalationTemplate,
     llmProvider: merged.llmProvider,
     ollamaBaseUrl: merged.ollamaBaseUrl,
     ollamaModel: merged.ollamaModel,
@@ -151,6 +165,9 @@ export async function getPublicSettings() {
     bluebubblesSendMethod: settings.bluebubblesSendMethod,
     bluebubblesServiceOrder: settings.bluebubblesServiceOrder,
     bluebubblesAddressFallback: settings.bluebubblesAddressFallback,
+    bluebubblesEscalationEnabled: settings.bluebubblesEscalationEnabled,
+    bluebubblesEscalationPhones: settings.bluebubblesEscalationPhones,
+    bluebubblesEscalationTemplate: settings.bluebubblesEscalationTemplate,
     llmProvider: settings.llmProvider,
     ollamaBaseUrl: settings.ollamaBaseUrl,
     ollamaModel: settings.ollamaModel,
@@ -176,6 +193,9 @@ export async function updatePublicSettings(payload) {
     'bluebubblesSendMethod',
     'bluebubblesServiceOrder',
     'bluebubblesAddressFallback',
+    'bluebubblesEscalationEnabled',
+    'bluebubblesEscalationPhones',
+    'bluebubblesEscalationTemplate',
     'llmProvider',
     'ollamaBaseUrl',
     'ollamaModel',

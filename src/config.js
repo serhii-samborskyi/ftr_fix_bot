@@ -41,7 +41,10 @@ export const config = {
     webhookSecret: process.env.BLUEBUBBLES_WEBHOOK_SECRET || '',
     sendMethod: process.env.BLUEBUBBLES_SEND_METHOD || 'private-api',
     serviceOrder: process.env.BLUEBUBBLES_SERVICE_ORDER || 'iMessage,SMS',
-    addressFallback: bool(process.env.BLUEBUBBLES_ADDRESS_FALLBACK, true)
+    addressFallback: bool(process.env.BLUEBUBBLES_ADDRESS_FALLBACK, true),
+    escalationEnabled: bool(process.env.BLUEBUBBLES_ESCALATION_ENABLED, false),
+    escalationPhones: process.env.BLUEBUBBLES_ESCALATION_PHONES || '',
+    escalationTemplate: process.env.BLUEBUBBLES_ESCALATION_TEMPLATE || ''
   },
   followup: {
     maxAgentMessages: number(process.env.FOLLOWUP_MAX_AGENT_MESSAGES, 6),
