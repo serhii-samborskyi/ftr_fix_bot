@@ -652,6 +652,11 @@ function collectSettings(formType) {
 }
 
 function wireEvents() {
+  $('#homeBtn').addEventListener('click', () => {
+    showView('jobsView', 'Jobs');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
   $$('.nav-button').forEach((button) => {
     button.addEventListener('click', () =>
       withButtonLoading(button, '', async () => {

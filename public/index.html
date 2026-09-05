@@ -2,18 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
     <title>FTR Fix Bot</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/assets/styles.css?v=20260905-bb-escalations" />
+    <link rel="stylesheet" href="/assets/styles.css?v=20260905-mobile-home" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <div>
+        <button class="brand-home" id="homeBtn" type="button" title="Jobs" aria-label="Open jobs">
           <p class="eyebrow">FTR Fix Bot</p>
           <h1 id="viewTitle">Jobs</h1>
-        </div>
+        </button>
         <button class="icon-button" id="refreshBtn" title="Refresh" aria-label="Refresh">Refresh</button>
       </header>
 
@@ -188,6 +188,6 @@
     </div>
     <div class="global-busy hidden" id="globalBusy">Working</div>
     <div class="global-status hidden" id="globalStatus"></div>
-    <script src="/assets/app.js?v=20260905-bb-escalations"></script>
+    <script src="/assets/app.js?v=20260905-mobile-home"></script>
   </body>
 </html>
