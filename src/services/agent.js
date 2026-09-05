@@ -78,7 +78,7 @@ const satisfiedPatterns = [
 function renderTemplate(template, job) {
   return String(template || '')
     .replaceAll('{{name}}', job.customer_name || job.customerName || 'there')
-    .replaceAll('{{tech}}', job.techName || job.tech_name || 'your technician')
+    .replaceAll('{{tech}}', job.techName || job.tech_name || 'technician')
     .replaceAll('{{address}}', job.address || 'your address')
     .replaceAll('{{primaryPhone}}', job.primaryPhone || job.primary_phone || '')
     .replaceAll('{{accountNumber}}', job.account_number || job.accountNumber || '')
@@ -341,9 +341,10 @@ Phone: ${jobValue(job, 'phone')}
 Primary phone: ${jobValue(job, 'primaryPhone', 'primary_phone')}
 Account: ${jobValue(job, 'accountNumber', 'account_number')}
 Address: ${jobValue(job, 'address') || 'the service address'}
-Technician: ${jobValue(job, 'techName', 'tech_name') || 'the technician'}
+Technician: ${jobValue(job, 'techName', 'tech_name') || 'technician'}
 
 Do not ask the customer to provide their name, address, account number, or other internal job details.
+If no technician name is available, refer to the technician as "technician".
 Only ask whether they were satisfied with the service visit.`
       }
     ]);
