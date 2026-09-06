@@ -162,6 +162,27 @@ function asksNeedsAttentionQuestion(text) {
   );
 }
 
+function isCourtesyOnly(text) {
+  const lower = normalizeText(text);
+  if (!lower) return false;
+  return /^(thanks|thank you|thank u|thx|ty|youre welcome|you're welcome|welcome|ok|okay|k|got it|sounds good|appreciate it|no problem|np)$/i.test(lower);
+}
+
+function isClosingAgentMessage(text) {
+  const lower = normalizeText(text);
+  if (!lower) return false;
+  return (
+    /\bglad\s+to\s+hear\b/.test(lower) ||
+    /\bthank(s| you)\b.*\b(feedback|confirming)\b/.test(lower) ||
+    /\bwe\s+appreciate\s+the\s+feedback\b/.test(lower) ||
+    /\bhave\s+a\s+good\s+day\b/.test(lower)
+  );
+}
+
+function jobIsSatisfied(job) {
+  return job?.status === 'satisfied' || job?.followupStatus === 'satisfied' || job?.followup_status === 'satisfied';
+}
+
 function isShortYes(text) {
   return /^(yes|yeah|yep|yup|correct|right|there is|there are|it does|they did)\b/.test(normalizeText(text));
 }
@@ -203,11 +224,19 @@ function satisfiedDecision(reply = 'Thanks for confirming. Have a good day.') {
   return { status: 'satisfied', reply, concernSummary: '' };
 }
 
-export function deterministicDecision({ conversation = [], customerText = '' } = {}) {
+export function deterministicDecision({ job = {}, conversation = [], customerText = '' } = {}) {
   const lastAgentText = lastOutboundMessage(conversation)?.body || '';
   const hasDetails = normalizeText(customerText).split(' ').length > 2;
 
   if (hasConcernSignal(customerText)) return concernDecision(customerText);
+
+  if (jobIsSatisfied(job) && (isCourtesyOnly(customerText) || hasSatisfiedSignal(customerText))) {
+    return satisfiedDecision('');
+  }
+
+  if (isCourtesyOnly(customerText) && isClosingAgentMessage(lastAgentText)) {
+    return satisfiedDecision('');
+  }
 
   if (asksNeedsAttentionQuestion(lastAgentText)) {
     if (isShortNo(customerText)) return satisfiedDecision();
@@ -223,12 +252,15 @@ export function deterministicDecision({ conversation = [], customerText = '' } =
 
   if (asksSatisfactionQuestion(lastAgentText)) {
     if (isShortNo(customerText)) return needsIssueDetailsDecision();
+    if (isCourtesyOnly(customerText)) return satisfiedDecision('');
     if (isShortYes(customerText) || hasSatisfiedSignal(customerText)) {
       return satisfiedDecision('Glad to hear it. Thank you for the feedback.');
     }
   }
 
-  if (hasSatisfiedSignal(customerText)) return satisfiedDecision('Thank you. We appreciate the feedback.');
+  if (hasSatisfiedSignal(customerText)) {
+    return satisfiedDecision(isCourtesyOnly(customerText) ? '' : 'Thank you. We appreciate the feedback.');
+  }
 
   return null;
 }
@@ -237,6 +269,10 @@ function preventRepeatedFollowup(decision, conversation = [], customerText = '')
   const normalized = normalizeDecision(decision);
   const lastAgentText = normalizeText(lastOutboundMessage(conversation)?.body || '');
   const replyText = normalizeText(normalized.reply);
+
+  if (normalized.status === 'satisfied' && isCourtesyOnly(customerText) && isClosingAgentMessage(lastAgentText)) {
+    normalized.reply = '';
+  }
 
   if (normalized.status === 'concern' && !normalized.reply) {
     normalized.reply = 'Thanks for letting us know. I will pass this to a manager so they can follow up with you.';
@@ -315,7 +351,9 @@ async function callModel(settings, messages, json = false) {
 function heuristicDecision(customerText) {
   if (hasConcernSignal(customerText)) return concernDecision(customerText);
 
-  if (hasSatisfiedSignal(customerText)) return satisfiedDecision('Thank you. We appreciate the feedback.');
+  if (hasSatisfiedSignal(customerText)) {
+    return satisfiedDecision(isCourtesyOnly(customerText) ? '' : 'Thank you. We appreciate the feedback.');
+  }
 
   return {
     status: 'needs_followup',
@@ -360,7 +398,7 @@ Only ask whether they were satisfied with the service visit.`
 
 export async function classifyCustomerReply({ job, conversation, customerText }) {
   const settings = await getRuntimeSettings();
-  const deterministic = deterministicDecision({ conversation, customerText });
+  const deterministic = deterministicDecision({ job, conversation, customerText });
   if (deterministic) return deterministic;
 
   if (!settings.llmProvider || settings.llmProvider === 'disabled') return heuristicDecision(customerText);
@@ -394,6 +432,8 @@ Classification guardrails:
 - If Agent asked whether the customer was satisfied and Customer says "no", status is "needs_followup" and ask what still needs attention.
 - If Agent asked whether anything still needs attention and Customer says "no", status is "satisfied".
 - If Agent asked whether anything still needs attention and Customer says "yes" plus any details, status is "concern".
+- If the customer already confirmed satisfaction and then sends only courtesy like "thanks", "thank you", "you're welcome", "ok", or "no problem", status is "satisfied" and reply is "".
+- Once the conversation has a satisfied closing acknowledgement, do not send another message unless the customer raises a new concern.
 - Any unresolved work, damage, loose/hanging/left wires, equipment left behind, billing issue, missed appointment, or manager request is "concern".
 - Never repeat the same Agent question already present in the conversation.
 

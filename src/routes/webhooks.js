@@ -42,7 +42,7 @@ async function insertInboundMessage(job, data, chatGuid, body) {
     `
       UPDATE jobs
       SET followup_status = CASE
-            WHEN followup_status IN ('concern', 'limit_reached') THEN followup_status
+            WHEN followup_status IN ('concern', 'satisfied', 'limit_reached') THEN followup_status
             ELSE 'conversation'
           END,
           last_contact_at = now(),
@@ -187,6 +187,13 @@ webhookRouter.post('/bluebubbles', verifyBlueBubblesWebhook, async (req, res, ne
     const agentMessageLimit = maxAgentMessages(settings);
     const decision = await classifyCustomerReply({ job, conversation, customerText: body });
     const canSendReply = Boolean(decision.reply) && agentMessageCount < agentMessageLimit;
+
+    if (!decision.reply && decision.status === 'satisfied') {
+      addWorkerLog('agent', 'info', 'No reply needed for satisfied conversation', {
+        jobId: job.id,
+        latestCustomerReply: truncateText(body, 160)
+      });
+    }
 
     if (decision.reply && canSendReply) {
       const sent = await sendBlueBubblesText({
