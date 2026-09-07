@@ -42,13 +42,16 @@ export const config = {
     sendMethod: process.env.BLUEBUBBLES_SEND_METHOD || 'private-api',
     serviceOrder: process.env.BLUEBUBBLES_SERVICE_ORDER || 'iMessage,SMS',
     addressFallback: bool(process.env.BLUEBUBBLES_ADDRESS_FALLBACK, true),
+    typingIndicatorsEnabled: bool(process.env.BLUEBUBBLES_TYPING_INDICATORS_ENABLED, true),
     escalationEnabled: bool(process.env.BLUEBUBBLES_ESCALATION_ENABLED, false),
     escalationPhones: process.env.BLUEBUBBLES_ESCALATION_PHONES || '',
     escalationTemplate: process.env.BLUEBUBBLES_ESCALATION_TEMPLATE || ''
   },
   followup: {
     maxAgentMessages: number(process.env.FOLLOWUP_MAX_AGENT_MESSAGES, 6),
-    conversationWindowDays: number(process.env.FOLLOWUP_CONVERSATION_WINDOW_DAYS, 30)
+    conversationWindowDays: number(process.env.FOLLOWUP_CONVERSATION_WINDOW_DAYS, 30),
+    replyDelayMinSeconds: number(process.env.FOLLOWUP_REPLY_DELAY_MIN_SECONDS, 5),
+    replyDelayMaxSeconds: number(process.env.FOLLOWUP_REPLY_DELAY_MAX_SECONDS, 10)
   },
   llm: {
     provider: process.env.LLM_PROVIDER || 'ollama',

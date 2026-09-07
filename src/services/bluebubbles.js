@@ -125,6 +125,13 @@ export async function getBlueBubblesMessage(guid) {
   return { result, message: message || null };
 }
 
+export async function sendBlueBubblesTyping({ chatGuid, typing = true }) {
+  if (!chatGuid) throw new Error('BlueBubbles chat GUID is required for typing indicators.');
+  return blueBubblesRequest(`/chat/${encodeURIComponent(chatGuid)}/typing`, {
+    method: typing ? 'POST' : 'DELETE'
+  });
+}
+
 function parseAddressFallback(value) {
   if (value === undefined || value === null || value === '') return true;
   return ['1', 'true', 'yes', 'on'].includes(String(value).toLowerCase());

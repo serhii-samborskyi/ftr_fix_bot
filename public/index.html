@@ -165,6 +165,7 @@
             <label>BlueBubbles send method <input id="bluebubblesSendMethod" placeholder="private-api" /></label>
             <label>BlueBubbles service order <input id="bluebubblesServiceOrder" placeholder="iMessage,SMS" /></label>
             <label class="toggle"><input type="checkbox" id="bluebubblesAddressFallback" /> Address fallback</label>
+            <label class="toggle"><input type="checkbox" id="bluebubblesTypingIndicatorsEnabled" /> iMessage typing indicators</label>
             <label class="toggle"><input type="checkbox" id="bluebubblesEscalationEnabled" /> BlueBubbles manager escalation</label>
             <label>Manager/supervisor phones <textarea id="bluebubblesEscalationPhones" rows="3" placeholder="+17731234567, +17739876543"></textarea></label>
             <label>Escalation SMS template <textarea id="bluebubblesEscalationTemplate" rows="8"></textarea></label>
@@ -187,6 +188,10 @@
             <label>Max agent messages <input id="followupMaxAgentMessages" type="number" min="1" max="50" /></label>
             <label>Conversation window days <input id="followupConversationWindowDays" type="number" min="1" max="3650" /></label>
             <div class="button-row">
+              <label>Reply delay min sec <input id="followupReplyDelayMinSeconds" type="number" min="0" max="300" step="0.5" /></label>
+              <label>Reply delay max sec <input id="followupReplyDelayMaxSeconds" type="number" min="0" max="300" step="0.5" /></label>
+            </div>
+            <div class="button-row">
               <button type="submit">Save settings</button>
               <button type="button" class="secondary" id="testBlueBubblesBtn">Test BlueBubbles</button>
             </div>
@@ -206,6 +211,6 @@
     </div>
     <div class="global-busy hidden" id="globalBusy">Working</div>
     <div class="global-status hidden" id="globalStatus"></div>
-    <script src="/assets/app.js?v=20260906-chat-scroll"></script>
+    <script src="/assets/app.js?v=20260907-reply-presence"></script>
   </body>
 </html>

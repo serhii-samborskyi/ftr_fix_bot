@@ -613,6 +613,8 @@ async function loadSettings() {
     'geminiModel',
     'followupMaxAgentMessages',
     'followupConversationWindowDays',
+    'followupReplyDelayMinSeconds',
+    'followupReplyDelayMaxSeconds',
     'systemPrompt',
     'initialMessageTemplate'
   ]) {
@@ -621,6 +623,7 @@ async function loadSettings() {
   }
   $('#telegramAckEnabled').checked = Boolean(settings.telegramAckEnabled);
   $('#bluebubblesAddressFallback').checked = Boolean(settings.bluebubblesAddressFallback);
+  $('#bluebubblesTypingIndicatorsEnabled').checked = Boolean(settings.bluebubblesTypingIndicatorsEnabled);
   $('#bluebubblesEscalationEnabled').checked = Boolean(settings.bluebubblesEscalationEnabled);
   $('#autoSendFollowup').checked = Boolean(settings.autoSendFollowup);
   $('#settingsStatus').textContent = [
@@ -753,7 +756,9 @@ function collectSettings(formType) {
           'geminiModel',
           'geminiApiKey',
           'followupMaxAgentMessages',
-          'followupConversationWindowDays'
+          'followupConversationWindowDays',
+          'followupReplyDelayMinSeconds',
+          'followupReplyDelayMaxSeconds'
         ];
 
   for (const id of ids) {
@@ -765,6 +770,7 @@ function collectSettings(formType) {
   if (formType !== 'prompt') {
     payload.telegramAckEnabled = $('#telegramAckEnabled').checked;
     payload.bluebubblesAddressFallback = $('#bluebubblesAddressFallback').checked;
+    payload.bluebubblesTypingIndicatorsEnabled = $('#bluebubblesTypingIndicatorsEnabled').checked;
     payload.bluebubblesEscalationEnabled = $('#bluebubblesEscalationEnabled').checked;
     payload.autoSendFollowup = $('#autoSendFollowup').checked;
   }

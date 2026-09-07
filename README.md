@@ -58,8 +58,11 @@ TELEGRAM_BOT_TOKEN=replace-with-bot-token
 BLUEBUBBLES_SERVER_URL=https://your-bluebubbles-server.example
 BLUEBUBBLES_PASSWORD=replace-with-bluebubbles-password
 BLUEBUBBLES_WEBHOOK_SECRET=change-this-webhook-secret
+BLUEBUBBLES_TYPING_INDICATORS_ENABLED=true
 BLUEBUBBLES_ESCALATION_ENABLED=false
 BLUEBUBBLES_ESCALATION_PHONES=
+FOLLOWUP_REPLY_DELAY_MIN_SECONDS=5
+FOLLOWUP_REPLY_DELAY_MAX_SECONDS=10
 SKIP_PRISMA_MIGRATE=false
 PRISMA_BASELINE_EXISTING_DB=true
 ```
@@ -92,6 +95,8 @@ https://your-app-domain.example/webhooks/bluebubbles?secret=BLUEBUBBLES_WEBHOOK_
 ```
 
 Enable at least the `new-message` event.
+
+Automated agent replies wait for a random delay between `FOLLOWUP_REPLY_DELAY_MIN_SECONDS` and `FOLLOWUP_REPLY_DELAY_MAX_SECONDS`. When `BLUEBUBBLES_TYPING_INDICATORS_ENABLED=true`, the app sends BlueBubbles typing indicators for iMessage chats during that wait. SMS chats still use the delay, but SMS has no typing indicator support.
 
 ## BlueBubbles Manager Escalation
 

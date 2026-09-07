@@ -13,6 +13,7 @@ const defaults = {
   bluebubblesSendMethod: config.bluebubbles.sendMethod,
   bluebubblesServiceOrder: config.bluebubbles.serviceOrder,
   bluebubblesAddressFallback: String(config.bluebubbles.addressFallback),
+  bluebubblesTypingIndicatorsEnabled: String(config.bluebubbles.typingIndicatorsEnabled),
   bluebubblesEscalationEnabled: String(config.bluebubbles.escalationEnabled),
   bluebubblesEscalationPhones: config.bluebubbles.escalationPhones,
   bluebubblesEscalationTemplate:
@@ -32,6 +33,8 @@ Concern: {{concern}}`,
   autoSendFollowup: String(config.autoSendFollowup),
   followupMaxAgentMessages: String(config.followup.maxAgentMessages),
   followupConversationWindowDays: String(config.followup.conversationWindowDays),
+  followupReplyDelayMinSeconds: String(config.followup.replyDelayMinSeconds),
+  followupReplyDelayMaxSeconds: String(config.followup.replyDelayMaxSeconds),
   systemPrompt: `You are the FTR Fix customer follow-up agent.
 
 Goal: identify whether the customer is satisfied after a completed service visit.
@@ -83,6 +86,12 @@ function parsePositiveInt(value, fallback, max = 1000) {
   return Math.min(max, Math.max(1, parsed));
 }
 
+function parseNonNegativeNumber(value, fallback, max = 300) {
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(0, parsed));
+}
+
 export async function getSetting(key, fallback = '') {
   const result = await query('SELECT value FROM settings WHERE key = $1', [key]);
   if (result.rows[0]) return result.rows[0].value;
@@ -122,6 +131,7 @@ export async function getRuntimeSettings() {
     bluebubblesSendMethod: merged.bluebubblesSendMethod,
     bluebubblesServiceOrder: merged.bluebubblesServiceOrder,
     bluebubblesAddressFallback: parseBool(merged.bluebubblesAddressFallback, true),
+    bluebubblesTypingIndicatorsEnabled: parseBool(merged.bluebubblesTypingIndicatorsEnabled, true),
     bluebubblesEscalationEnabled: parseBool(merged.bluebubblesEscalationEnabled, false),
     bluebubblesEscalationPhones: merged.bluebubblesEscalationPhones,
     bluebubblesEscalationTemplate: merged.bluebubblesEscalationTemplate,
@@ -133,6 +143,8 @@ export async function getRuntimeSettings() {
     autoSendFollowup: parseBool(merged.autoSendFollowup, true),
     followupMaxAgentMessages: parsePositiveInt(merged.followupMaxAgentMessages, 6, 50),
     followupConversationWindowDays: parsePositiveInt(merged.followupConversationWindowDays, 30, 3650),
+    followupReplyDelayMinSeconds: parseNonNegativeNumber(merged.followupReplyDelayMinSeconds, 5, 300),
+    followupReplyDelayMaxSeconds: parseNonNegativeNumber(merged.followupReplyDelayMaxSeconds, 10, 300),
     systemPrompt: merged.systemPrompt,
     initialMessageTemplate: merged.initialMessageTemplate
   };
@@ -169,6 +181,7 @@ export async function getPublicSettings() {
     bluebubblesSendMethod: settings.bluebubblesSendMethod,
     bluebubblesServiceOrder: settings.bluebubblesServiceOrder,
     bluebubblesAddressFallback: settings.bluebubblesAddressFallback,
+    bluebubblesTypingIndicatorsEnabled: settings.bluebubblesTypingIndicatorsEnabled,
     bluebubblesEscalationEnabled: settings.bluebubblesEscalationEnabled,
     bluebubblesEscalationPhones: settings.bluebubblesEscalationPhones,
     bluebubblesEscalationTemplate: settings.bluebubblesEscalationTemplate,
@@ -180,6 +193,8 @@ export async function getPublicSettings() {
     autoSendFollowup: settings.autoSendFollowup,
     followupMaxAgentMessages: settings.followupMaxAgentMessages,
     followupConversationWindowDays: settings.followupConversationWindowDays,
+    followupReplyDelayMinSeconds: settings.followupReplyDelayMinSeconds,
+    followupReplyDelayMaxSeconds: settings.followupReplyDelayMaxSeconds,
     systemPrompt: settings.systemPrompt,
     initialMessageTemplate: settings.initialMessageTemplate
   };
@@ -197,6 +212,7 @@ export async function updatePublicSettings(payload) {
     'bluebubblesSendMethod',
     'bluebubblesServiceOrder',
     'bluebubblesAddressFallback',
+    'bluebubblesTypingIndicatorsEnabled',
     'bluebubblesEscalationEnabled',
     'bluebubblesEscalationPhones',
     'bluebubblesEscalationTemplate',
@@ -207,6 +223,8 @@ export async function updatePublicSettings(payload) {
     'autoSendFollowup',
     'followupMaxAgentMessages',
     'followupConversationWindowDays',
+    'followupReplyDelayMinSeconds',
+    'followupReplyDelayMaxSeconds',
     'systemPrompt',
     'initialMessageTemplate'
   ];

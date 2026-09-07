@@ -1,6 +1,11 @@
 import express from 'express';
 import { classifyCustomerReply } from '../services/agent.js';
-import { getBlueBubblesChatGuid, getBlueBubblesExternalGuid, sendBlueBubblesText } from '../services/bluebubbles.js';
+import {
+  getBlueBubblesChatGuid,
+  getBlueBubblesExternalGuid,
+  sendBlueBubblesText,
+  sendBlueBubblesTyping
+} from '../services/bluebubbles.js';
 import { escalateJobConcern } from '../services/escalations.js';
 import { getConversation, getJobByPhoneOrChat, updateOutboundDeliveryFromMessage } from '../services/jobs.js';
 import { getRuntimeSettings } from '../services/settings.js';
@@ -62,6 +67,81 @@ function countAgentMessages(conversation) {
 function maxAgentMessages(settings) {
   const parsed = Number.parseInt(settings.followupMaxAgentMessages, 10);
   return Number.isFinite(parsed) ? Math.min(50, Math.max(1, parsed)) : 6;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function agentReplyDelayMs(settings) {
+  const min = Number(settings.followupReplyDelayMinSeconds);
+  const max = Number(settings.followupReplyDelayMaxSeconds);
+  const low = Number.isFinite(min) ? Math.min(300, Math.max(0, min)) : 5;
+  const high = Number.isFinite(max) ? Math.min(300, Math.max(0, max)) : 10;
+  const start = Math.min(low, high);
+  const end = Math.max(low, high);
+  if (end <= 0) return 0;
+  return Math.round((start + Math.random() * (end - start)) * 1000);
+}
+
+function isIMessageChat(chatGuid, data = {}) {
+  const candidates = [
+    chatGuid,
+    data.handle?.service,
+    data.service,
+    data.chats?.[0]?.guid,
+    data.chatGuid,
+    data.chat?.guid
+  ];
+  return candidates.some((value) => {
+    const text = String(value || '').trim();
+    return /^imessage$/i.test(text) || /^imessage;-;/i.test(text);
+  });
+}
+
+async function sendTyping(chatGuid, typing, meta = {}) {
+  try {
+    await sendBlueBubblesTyping({ chatGuid, typing });
+    return true;
+  } catch (error) {
+    addWorkerLog('bluebubbles', 'warn', `BlueBubbles typing ${typing ? 'start' : 'stop'} failed`, errorToLogMeta(error, meta));
+    return false;
+  }
+}
+
+async function prepareAutomatedReply({ settings, chatGuid, data, jobId }) {
+  const delayMs = agentReplyDelayMs(settings);
+  const typingEnabled = Boolean(settings.bluebubblesTypingIndicatorsEnabled);
+  const canType = typingEnabled && chatGuid && isIMessageChat(chatGuid, data);
+  let typingStarted = false;
+
+  if (canType) {
+    typingStarted = await sendTyping(chatGuid, true, { jobId, chatGuid });
+  }
+
+  if (delayMs > 0) {
+    addWorkerLog('agent', 'info', 'Agent reply delay started', {
+      jobId,
+      delaySeconds: (delayMs / 1000).toFixed(1),
+      typing: String(Boolean(typingStarted)),
+      chatGuid: chatGuid || ''
+    });
+    await sleep(delayMs);
+  }
+
+  if (typingStarted) {
+    await sendTyping(chatGuid, false, { jobId, chatGuid });
+  }
+
+  return {
+    delayMs,
+    typingStarted
+  };
+}
+
+async function finishAutomatedReplyPresence({ chatGuid, typingStarted, jobId }) {
+  if (!typingStarted || !chatGuid) return;
+  await sendTyping(chatGuid, false, { jobId, chatGuid, stage: 'after-send' });
 }
 
 async function markReplyLimitReached(jobId, meta = {}) {
@@ -196,12 +276,33 @@ webhookRouter.post('/bluebubbles', verifyBlueBubblesWebhook, async (req, res, ne
     }
 
     if (decision.reply && canSendReply) {
-      const sent = await sendBlueBubblesText({
-        phone: sender || job.normalizedPhone || job.phone || job.normalizedPrimaryPhone || job.primaryPhone,
-        chatGuid: chatGuid || job.followupChatGuid,
-        message: decision.reply
+      const replyChatGuid = chatGuid || job.followupChatGuid || null;
+      const presence = await prepareAutomatedReply({
+        settings,
+        chatGuid: replyChatGuid,
+        data,
+        jobId: job.id
       });
-      const sentChatGuid = getBlueBubblesChatGuid(sent, chatGuid || job.followupChatGuid || null);
+      let sent;
+      try {
+        sent = await sendBlueBubblesText({
+          phone: sender || job.normalizedPhone || job.phone || job.normalizedPrimaryPhone || job.primaryPhone,
+          chatGuid: replyChatGuid,
+          message: decision.reply
+        });
+      } finally {
+        await finishAutomatedReplyPresence({
+          chatGuid: replyChatGuid,
+          typingStarted: presence.typingStarted,
+          jobId: job.id
+        });
+      }
+      const sentChatGuid = getBlueBubblesChatGuid(sent, replyChatGuid);
+      await finishAutomatedReplyPresence({
+        chatGuid: sentChatGuid !== replyChatGuid ? sentChatGuid : '',
+        typingStarted: presence.typingStarted,
+        jobId: job.id
+      });
       const externalGuid = getBlueBubblesExternalGuid(sent);
       await withTransaction(async (client) => {
         await client.query(
@@ -226,7 +327,9 @@ webhookRouter.post('/bluebubbles', verifyBlueBubblesWebhook, async (req, res, ne
       addWorkerLog('bluebubbles', 'info', 'BlueBubbles webhook reply sent', {
         jobId: job.id,
         chatGuid: sentChatGuid || '',
-        externalGuid: externalGuid || ''
+        externalGuid: externalGuid || '',
+        delaySeconds: (presence.delayMs / 1000).toFixed(1),
+        typing: String(Boolean(presence.typingStarted))
       });
       if (decision.status === 'needs_followup' && agentMessageCount + 1 >= agentMessageLimit) {
         await markReplyLimitReached(job.id, {
