@@ -190,11 +190,34 @@ function showChatInbox() {
   if ($('#conversationView')?.classList.contains('active')) $('#viewTitle').textContent = 'Chat';
 }
 
+function resizeChatThread() {
+  const pane = $('#chatThreadPane');
+  if (!pane || pane.classList.contains('hidden')) return;
+
+  const navHeight = $('.bottom-nav')?.getBoundingClientRect().height || 0;
+  const viewportHeight = window.visualViewport?.height || window.innerHeight;
+  const top = pane.getBoundingClientRect().top;
+  const available = Math.max(320, Math.floor(viewportHeight - top - navHeight - 10));
+  pane.style.height = `${available}px`;
+}
+
+function scrollConversationToBottom() {
+  const list = $('#conversationList');
+  if (!list) return;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      list.scrollTop = list.scrollHeight;
+    });
+  });
+}
+
 function showChatThread() {
   state.chatMode = 'thread';
   $('#chatInboxPane')?.classList.add('hidden');
   $('#chatThreadPane')?.classList.remove('hidden');
   if ($('#conversationView')?.classList.contains('active')) $('#viewTitle').textContent = 'Conversation';
+  resizeChatThread();
+  scrollConversationToBottom();
 }
 
 function renderStats(stats) {
@@ -386,9 +409,13 @@ async function loadJob(id, view = 'reviewView') {
   const payload = await api(`/api/jobs/${id}`);
   fillJobForm(payload.job);
   if (view === 'conversationView') {
+    showView('conversationView', 'Conversation');
+    showChatThread();
     await loadConversation(id);
     await loadRecentConversations();
-    showChatThread();
+    resizeChatThread();
+    scrollConversationToBottom();
+    return;
   }
   showView(view, view === 'conversationView' ? 'Conversation' : 'Review');
 }
@@ -411,7 +438,8 @@ function renderConversation(messages = []) {
         `
       )
       .join('') || '<div class="empty">No messages yet.</div>';
-  list.scrollTop = list.scrollHeight;
+  resizeChatThread();
+  scrollConversationToBottom();
 }
 
 async function loadConversation(id = state.selectedJob?.id) {
@@ -1048,3 +1076,6 @@ window.addEventListener('unhandledrejection', (event) => {
   const message = event.reason?.message || 'Action failed.';
   showGlobalStatus(message, 'error');
 });
+
+window.addEventListener('resize', resizeChatThread);
+window.visualViewport?.addEventListener('resize', resizeChatThread);
