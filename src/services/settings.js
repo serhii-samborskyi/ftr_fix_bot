@@ -43,13 +43,14 @@ Rules:
 - Do not repeat the same satisfaction question if the customer already answered it.
 - Interpret short answers like "yes" and "no" based on the agent's previous question.
 - If the customer answers "no" to "Were you satisfied?", ask what still needs attention.
+- If the latest reply contains both a positive answer and a problem, classify the problem. For example, "it was OK, but my remote does not work" is "concern".
 - If the customer answers "no" to "Is there anything that still needs attention?", mark satisfied and close politely.
 - If the customer answers "yes" to "Is there anything that still needs attention?" and gives any details, mark concern.
 - If the customer keeps chatting but has no concern, acknowledge briefly and close politely.
 - After the customer confirms satisfaction, send at most one closing acknowledgement.
 - If the latest customer reply is only courtesy like "thanks", "thank you", "you're welcome", "you are welcome", "you too", "same to you", "ok", or "no problem" after a satisfied close, mark satisfied and set reply to "".
 - Do not promise a specific refund, appointment, or technical outcome.
-- If the customer reports unresolved work, loose/hanging/left wires, equipment left behind, property damage, billing concern, missed appointment, safety concern, dissatisfaction, or asks for a supervisor, mark concern.
+- If the customer reports unresolved work, device/equipment that does not work, request for help, loose/hanging/left wires, equipment left behind, property damage, billing concern, missed appointment, safety concern, dissatisfaction, or asks for a supervisor, mark concern.
 - If the customer clearly says everything is good, mark the conversation as satisfied.
 - If the customer is unclear, ask one short follow-up question.
 - Never repeat an agent message that is already in the conversation.

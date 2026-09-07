@@ -5,6 +5,17 @@ import { errorToLogMeta, truncateText } from '../utils/errors.js';
 const concernKeywords = [
   'not fixed',
   'not working',
+  "doesn't work",
+  'does not work',
+  'wont work',
+  "won't work",
+  'cant get',
+  "can't get",
+  'cannot get',
+  'can you help',
+  'could you help',
+  'need help',
+  'stopped working',
   'not done',
   'not complete',
   'not resolved',
@@ -57,6 +68,10 @@ const satisfiedKeywords = [
 
 const concernPatterns = [
   /\bnot\s+(fixed|working|done|complete|resolved|happy|satisfied)\b/,
+  /\b(not|wasn'?t|isn'?t)\s+(good|ok|okay|fine|great)\b/,
+  /\b(doesn'?t|does not|isn'?t|is not|won'?t|will not|cant|can't|cannot|can not)\s+(work|working|turn on|connect|respond|function)\b/,
+  /\b(can|could)\s+you\s+(help|send|fix|check)\b/,
+  /\b(stopped|quit)\s+working\b/,
   /\bstill\s+(not|broken|down|out|loose|hanging|bad|wrong|doesn'?t|isn'?t)\b/,
   /\b(left|leaving)\b.*\b(wire|wires|cable|line|trash|mess|equipment|box|yard|backyard)\b/,
   /\b(wire|wires|cable|line|equipment|box)\b.*\b(left|loose|hanging|outside|yard|backyard|damaged|broken)\b/,
@@ -135,6 +150,7 @@ function normalizeDecision(value) {
 function normalizeText(value) {
   return String(value || '')
     .toLowerCase()
+    .replace(/[’‘`]/g, "'")
     .replace(/[^\p{L}\p{N}' ]+/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -211,8 +227,9 @@ function isShortNo(text) {
 function hasConcernSignal(text) {
   const lower = normalizeText(text);
   if (!lower) return false;
+  if (concernPatterns.some((pattern) => pattern.test(lower))) return true;
   if (satisfiedPatterns.some((pattern) => pattern.test(lower))) return false;
-  return concernPatterns.some((pattern) => pattern.test(lower)) || concernKeywords.some((word) => lower.includes(word));
+  return concernKeywords.some((word) => lower.includes(word));
 }
 
 function hasSatisfiedSignal(text) {
@@ -272,9 +289,12 @@ export function deterministicDecision({ job = {}, conversation = [], customerTex
   }
 
   if (asksSatisfactionQuestion(lastAgentText)) {
+    if (hasSatisfiedSignal(customerText)) {
+      return satisfiedDecision(isCourtesyOnly(customerText) ? '' : 'Glad to hear it. Thank you for the feedback.');
+    }
     if (isShortNo(customerText)) return needsIssueDetailsDecision();
     if (isCourtesyOnly(customerText)) return satisfiedDecision('');
-    if (isShortYes(customerText) || hasSatisfiedSignal(customerText)) {
+    if (isShortYes(customerText)) {
       return satisfiedDecision('Glad to hear it. Thank you for the feedback.');
     }
   }
@@ -455,11 +475,12 @@ ${customerText}
 Classification guardrails:
 - Interpret "yes" and "no" based on the Agent's latest question.
 - If Agent asked whether the customer was satisfied and Customer says "no", status is "needs_followup" and ask what still needs attention.
+- If the latest reply contains both a positive answer and a problem, classify the problem. For example, "it was OK, but my remote does not work" is "concern".
 - If Agent asked whether anything still needs attention and Customer says "no", status is "satisfied".
 - If Agent asked whether anything still needs attention and Customer says "yes" plus any details, status is "concern".
 - If the customer already confirmed satisfaction and then sends only courtesy like "thanks", "thank you", "you're welcome", "you are welcome", "you too", "same to you", "ok", or "no problem", status is "satisfied" and reply is "".
 - Once the conversation has a satisfied closing acknowledgement, do not send another message unless the customer raises a new concern.
-- Any unresolved work, damage, loose/hanging/left wires, equipment left behind, billing issue, missed appointment, or manager request is "concern".
+- Any unresolved work, device/equipment that does not work, request for help, damage, loose/hanging/left wires, equipment left behind, billing issue, missed appointment, or manager request is "concern".
 - Never repeat the same Agent question already present in the conversation.
 
 Classify the latest reply. Return strict JSON only.`
