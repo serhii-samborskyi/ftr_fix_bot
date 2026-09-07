@@ -165,7 +165,7 @@ function asksNeedsAttentionQuestion(text) {
 function isCourtesyOnly(text) {
   const lower = normalizeText(text);
   if (!lower) return false;
-  return /^(thanks|thank you|thank u|thx|ty|youre welcome|you're welcome|welcome|ok|okay|k|got it|sounds good|appreciate it|no problem|np)$/i.test(lower);
+  return /^(thanks|thank you|thank u|thx|ty|youre welcome|you're welcome|you are welcome|welcome|you too|u too|you as well|same to you|same for you|likewise|have a good one|have a good day too|ok|okay|k|got it|sounds good|appreciate it|no problem|np)$/i.test(lower);
 }
 
 function isClosingAgentMessage(text) {
@@ -179,8 +179,25 @@ function isClosingAgentMessage(text) {
   );
 }
 
+function hasClosingAgentMessage(conversation = []) {
+  return conversation.some((message) => message.direction === 'outbound' && isClosingAgentMessage(message.body));
+}
+
 function jobIsSatisfied(job) {
   return job?.status === 'satisfied' || job?.followupStatus === 'satisfied' || job?.followup_status === 'satisfied';
+}
+
+function isLowInformationPostCloseReply(text) {
+  const raw = String(text || '').trim();
+  const lower = normalizeText(raw);
+  if (!raw) return false;
+  if (/[?]/.test(raw)) return false;
+  if (!lower) return true;
+
+  const words = lower.split(' ').filter(Boolean);
+  if (isCourtesyOnly(lower)) return true;
+  if (words.length > 5) return false;
+  return /^(you too|u too|you as well|same to you|same for you|same here|likewise|thank you too|thanks you too|thanks too|you have a good|have a good|sounds good|ok thanks|okay thanks|all good thanks|no thanks|no thank you)$/.test(lower);
 }
 
 function isShortYes(text) {
@@ -230,6 +247,10 @@ export function deterministicDecision({ job = {}, conversation = [], customerTex
 
   if (hasConcernSignal(customerText)) return concernDecision(customerText);
 
+  if ((jobIsSatisfied(job) || hasClosingAgentMessage(conversation)) && isLowInformationPostCloseReply(customerText)) {
+    return satisfiedDecision('');
+  }
+
   if (jobIsSatisfied(job) && (isCourtesyOnly(customerText) || hasSatisfiedSignal(customerText))) {
     return satisfiedDecision('');
   }
@@ -269,6 +290,10 @@ function preventRepeatedFollowup(decision, conversation = [], customerText = '')
   const normalized = normalizeDecision(decision);
   const lastAgentText = normalizeText(lastOutboundMessage(conversation)?.body || '');
   const replyText = normalizeText(normalized.reply);
+
+  if (normalized.status !== 'concern' && hasClosingAgentMessage(conversation) && isLowInformationPostCloseReply(customerText)) {
+    return satisfiedDecision('');
+  }
 
   if (normalized.status === 'satisfied' && isCourtesyOnly(customerText) && isClosingAgentMessage(lastAgentText)) {
     normalized.reply = '';
@@ -397,10 +422,10 @@ Only ask whether they were satisfied with the service visit.`
 }
 
 export async function classifyCustomerReply({ job, conversation, customerText }) {
-  const settings = await getRuntimeSettings();
   const deterministic = deterministicDecision({ job, conversation, customerText });
   if (deterministic) return deterministic;
 
+  const settings = await getRuntimeSettings();
   if (!settings.llmProvider || settings.llmProvider === 'disabled') return heuristicDecision(customerText);
 
   const transcript = conversation
@@ -432,7 +457,7 @@ Classification guardrails:
 - If Agent asked whether the customer was satisfied and Customer says "no", status is "needs_followup" and ask what still needs attention.
 - If Agent asked whether anything still needs attention and Customer says "no", status is "satisfied".
 - If Agent asked whether anything still needs attention and Customer says "yes" plus any details, status is "concern".
-- If the customer already confirmed satisfaction and then sends only courtesy like "thanks", "thank you", "you're welcome", "ok", or "no problem", status is "satisfied" and reply is "".
+- If the customer already confirmed satisfaction and then sends only courtesy like "thanks", "thank you", "you're welcome", "you are welcome", "you too", "same to you", "ok", or "no problem", status is "satisfied" and reply is "".
 - Once the conversation has a satisfied closing acknowledgement, do not send another message unless the customer raises a new concern.
 - Any unresolved work, damage, loose/hanging/left wires, equipment left behind, billing issue, missed appointment, or manager request is "concern".
 - Never repeat the same Agent question already present in the conversation.
