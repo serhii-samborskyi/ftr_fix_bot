@@ -91,8 +91,10 @@ const satisfiedPatterns = [
 ];
 
 function renderTemplate(template, job) {
+  const fullName = job.customer_name || job.customerName || '';
   return String(template || '')
-    .replaceAll('{{name}}', job.customer_name || job.customerName || 'there')
+    .replaceAll('{{name}}', greetingName(fullName))
+    .replaceAll('{{fullName}}', fullName || 'there')
     .replaceAll('{{tech}}', job.techName || job.tech_name || 'technician')
     .replaceAll('{{address}}', job.address || 'your address')
     .replaceAll('{{primaryPhone}}', job.primaryPhone || job.primary_phone || '')
@@ -101,11 +103,36 @@ function renderTemplate(template, job) {
     .trim();
 }
 
+export function greetingName(fullName) {
+  const cleaned = String(fullName || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) return 'there';
+
+  if (cleaned.includes(',')) {
+    const [, firstAfterComma] = cleaned.split(',').map((part) => part.trim());
+    if (firstAfterComma) return firstAfterComma.split(' ')[0] || firstAfterComma;
+  }
+
+  return cleaned.split(' ')[0] || cleaned;
+}
+
 function jobValue(job, camelKey, snakeKey = camelKey) {
   return job?.[camelKey] || job?.[snakeKey] || '';
 }
 
-function cleanInitialFollowup(content, fallback, { requiredText = '' } = {}) {
+function escapeRegExp(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function useGreetingName(message, fullName) {
+  const full = String(fullName || '').trim();
+  const first = greetingName(full);
+  if (!full || first === full) return message;
+  return String(message || '').replace(new RegExp(`\\b${escapeRegExp(full)}\\b`, 'i'), first);
+}
+
+function cleanInitialFollowup(content, fallback, { requiredText = '', fullName = '' } = {}) {
   const text = String(content || '').trim().replace(/^["']|["']$/g, '');
   const lower = text.toLowerCase();
   const required = String(requiredText || '').trim().toLowerCase();
@@ -117,7 +144,7 @@ function cleanInitialFollowup(content, fallback, { requiredText = '' } = {}) {
   }
   if (required && String(fallback || '').toLowerCase().includes(required) && !lower.includes(required)) return fallback;
 
-  return text;
+  return useGreetingName(text, fullName);
 }
 
 function extractJsonObject(text) {
@@ -410,6 +437,8 @@ function heuristicDecision(customerText) {
 export async function buildInitialFollowup(job) {
   const settings = await getRuntimeSettings();
   const fallback = renderTemplate(settings.initialMessageTemplate, job);
+  const fullName = jobValue(job, 'customerName', 'customer_name');
+  const firstName = greetingName(fullName);
 
   if (!settings.llmProvider || settings.llmProvider === 'disabled') return fallback;
 
@@ -419,19 +448,24 @@ export async function buildInitialFollowup(job) {
       {
         role: 'user',
         content: `Write one short initial SMS follow-up for this customer. No JSON.
-Customer name: ${jobValue(job, 'customerName', 'customer_name') || 'there'}
+Customer full name: ${fullName || 'there'}
+Customer greeting name: ${firstName}
 Phone: ${jobValue(job, 'phone')}
 Primary phone: ${jobValue(job, 'primaryPhone', 'primary_phone')}
 Account: ${jobValue(job, 'accountNumber', 'account_number')}
 Address: ${jobValue(job, 'address') || 'the service address'}
 Technician: ${jobValue(job, 'techName', 'tech_name') || 'technician'}
 
+Use the customer greeting name in the greeting. Do not greet with the full name.
 Do not ask the customer to provide their name, address, account number, or other internal job details.
 If no technician name is available, refer to the technician as "technician".
 Only ask whether they were satisfied with the service visit.`
       }
     ]);
-    return cleanInitialFollowup(content, fallback, { requiredText: jobValue(job, 'techName', 'tech_name') });
+    return cleanInitialFollowup(content, fallback, {
+      requiredText: jobValue(job, 'techName', 'tech_name'),
+      fullName
+    });
   } catch (error) {
     addWorkerLog('agent', 'warn', 'Initial follow-up model failed; using template', errorToLogMeta(error, {
       provider: settings.llmProvider,
