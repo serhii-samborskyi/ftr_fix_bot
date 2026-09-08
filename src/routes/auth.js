@@ -15,7 +15,7 @@ export function requireAuth(req, res, next) {
   if (req.baseUrl === '/api' || req.originalUrl.startsWith('/api/')) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-  return res.redirect('/login');
+  return res.redirect(`/login?returnTo=${encodeURIComponent(req.originalUrl || '/')}`);
 }
 
 authRouter.post('/login', async (req, res) => {

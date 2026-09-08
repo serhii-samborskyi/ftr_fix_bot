@@ -1,6 +1,12 @@
 const form = document.querySelector('#loginForm');
 const error = document.querySelector('#loginError');
 
+function loginReturnTo() {
+  const value = new URLSearchParams(window.location.search).get('returnTo') || '/';
+  if (!value.startsWith('/') || value.startsWith('//')) return '/';
+  return value;
+}
+
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   error.textContent = '';
@@ -12,7 +18,7 @@ form.addEventListener('submit', async (event) => {
   });
 
   if (response.ok) {
-    window.location.href = '/';
+    window.location.href = loginReturnTo();
     return;
   }
 

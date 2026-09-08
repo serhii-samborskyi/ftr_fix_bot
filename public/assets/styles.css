@@ -183,6 +183,10 @@ button.danger-button,
   align-items: end;
 }
 
+.prompt-button-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .hidden {
   display: none;
 }
@@ -880,6 +884,10 @@ textarea {
   .button-row,
   .split {
     grid-template-columns: 1fr;
+  }
+
+  .prompt-button-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .job-card {

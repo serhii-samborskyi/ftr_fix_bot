@@ -41,7 +41,11 @@ async function api(path, options = {}) {
         ...(options.headers || {})
       }
     });
-    if (response.status === 401) window.location.href = '/login';
+    if (response.status === 401) {
+      const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      window.location.href = `/login?returnTo=${encodeURIComponent(returnTo)}`;
+      return {};
+    }
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || response.statusText);
     return payload;
@@ -75,6 +79,13 @@ function showView(viewId, title) {
   $$('.view').forEach((view) => view.classList.toggle('active', view.id === viewId));
   $$('.nav-button').forEach((button) => button.classList.toggle('active', button.dataset.view === viewId));
   $('#viewTitle').textContent = title;
+}
+
+function requestedConversationJobId() {
+  const params = new URLSearchParams(window.location.search);
+  const view = String(params.get('view') || '').toLowerCase();
+  if (view === 'conversation') return params.get('jobId') || params.get('job') || '';
+  return params.get('conversation') || '';
 }
 
 function escapeHtml(value) {
@@ -737,6 +748,11 @@ async function copyText(value) {
   textarea.remove();
 }
 
+async function readClipboardText() {
+  if (!navigator.clipboard?.readText) throw new Error('Clipboard paste is not available in this browser.');
+  return navigator.clipboard.readText();
+}
+
 function renderWorkerLogs(logs = []) {
   const list = $('#workerLogList');
   if (!logs.length) {
@@ -1055,6 +1071,25 @@ function wireEvents() {
     });
   });
 
+  $('#copySystemPromptBtn').addEventListener('click', (event) =>
+    withButtonLoading(event.currentTarget, 'Copying', async () => {
+      await copyText($('#systemPrompt').value);
+      showGlobalStatus('System prompt copied.');
+    })
+  );
+
+  $('#pasteSystemPromptBtn').addEventListener('click', (event) =>
+    withButtonLoading(event.currentTarget, 'Pasting', async () => {
+      $('#systemPrompt').value = await readClipboardText();
+      showGlobalStatus('System prompt pasted.');
+    })
+  );
+
+  $('#clearSystemPromptBtn').addEventListener('click', () => {
+    $('#systemPrompt').value = '';
+    showGlobalStatus('System prompt cleared.');
+  });
+
   $('#technicianForm').addEventListener('submit', async (event) => {
     event.preventDefault();
     const id = $('#technicianId').value;
@@ -1158,6 +1193,10 @@ async function init() {
   await loadTechnicians();
   await refreshMainData();
   await loadRecentConversations();
+  const conversationJobId = requestedConversationJobId();
+  if (conversationJobId) {
+    await loadJob(conversationJobId, 'conversationView');
+  }
 }
 
 init().catch((error) => {

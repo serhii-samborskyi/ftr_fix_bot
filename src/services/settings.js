@@ -25,6 +25,7 @@ Primary phone: {{primaryPhone}}
 Account #: {{accountNumber}}
 Address: {{address}}
 Technician: {{tech}}
+Conversation: {{conversationLink}}
 Concern: {{concern}}`,
   llmProvider: config.llm.provider,
   classificationMode: config.llm.classificationMode,

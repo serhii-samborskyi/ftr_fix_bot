@@ -41,7 +41,19 @@ const jobTechJoin = `
          AND jobs.source_sender_username <> ''
          AND lower(regexp_replace(technicians.telegram_id, '^@+', '')) = lower(regexp_replace(jobs.source_sender_username, '^@+', ''))
        )
-    ORDER BY CASE WHEN technicians.telegram_id = jobs.source_sender_id THEN 0 ELSE 1 END,
+       OR (
+         jobs.source_sender_name IS NOT NULL
+         AND jobs.source_sender_name <> ''
+         AND lower(trim(regexp_replace(technicians.name, '[[:space:]]+', ' ', 'g'))) =
+             lower(trim(regexp_replace(jobs.source_sender_name, '[[:space:]]+', ' ', 'g')))
+       )
+    ORDER BY CASE
+               WHEN technicians.telegram_id = jobs.source_sender_id THEN 0
+               WHEN jobs.source_sender_username IS NOT NULL
+                    AND jobs.source_sender_username <> ''
+                    AND lower(regexp_replace(technicians.telegram_id, '^@+', '')) = lower(regexp_replace(jobs.source_sender_username, '^@+', '')) THEN 1
+               ELSE 2
+             END,
              technicians.updated_at DESC
     LIMIT 1
   ) tech ON true

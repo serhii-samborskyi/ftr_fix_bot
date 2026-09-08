@@ -26,8 +26,25 @@ function telegramPoster(job) {
   return 'Unknown';
 }
 
-function managerMessage(job, reason) {
-  return [
+function conversationLink(settings, job) {
+  const jobId = jobValue(job, 'id');
+  let base = String(settings?.appBaseUrl || '').trim().replace(/\/+$/, '');
+  if (!base || !jobId) return '';
+  if (!/^https?:\/\//i.test(base)) base = `https://${base}`;
+
+  try {
+    const url = new URL('/', base);
+    url.searchParams.set('view', 'conversation');
+    url.searchParams.set('jobId', jobId);
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
+
+function managerMessage(job, reason, settings = {}) {
+  const link = conversationLink(settings, job);
+  const lines = [
     'Customer concern detected',
     '',
     `Name: ${jobValue(job, 'customerName', 'customer_name') || 'Unknown'}`,
@@ -36,10 +53,11 @@ function managerMessage(job, reason) {
     `Account #: ${jobValue(job, 'accountNumber', 'account_number') || 'Unknown'}`,
     `Address: ${jobValue(job, 'address') || 'Unknown'}`,
     `Technician: ${jobValue(job, 'techName', 'tech_name') || 'Unmatched'}`,
-    `Posted by: ${telegramPoster(job)}`,
-    '',
-    `Concern: ${reason || 'No summary provided.'}`
-  ].join('\n');
+    `Posted by: ${telegramPoster(job)}`
+  ];
+  if (link) lines.push(`Conversation: ${link}`);
+  lines.push('', `Concern: ${reason || 'No summary provided.'}`);
+  return lines.join('\n');
 }
 
 export function parseBlueBubblesEscalationPhones(value) {
@@ -55,7 +73,8 @@ export function parseBlueBubblesEscalationPhones(value) {
     });
 }
 
-export function renderBlueBubblesEscalationMessage(template, job, reason) {
+export function renderBlueBubblesEscalationMessage(template, job, reason, settings = {}) {
+  const link = conversationLink(settings, job);
   const values = {
     name: jobValue(job, 'customerName', 'customer_name') || 'Unknown',
     phone: jobValue(job, 'phone') || jobValue(job, 'normalizedPhone', 'normalized_phone') || 'Unknown',
@@ -66,13 +85,17 @@ export function renderBlueBubblesEscalationMessage(template, job, reason) {
     techId: jobValue(job, 'techId', 'tech_id') || '',
     techTelegramId: jobValue(job, 'techTelegramId', 'tech_telegram_id') || '',
     telegramPoster: telegramPoster(job),
+    conversationLink: link,
     concern: reason || 'No summary provided.',
     jobId: jobValue(job, 'id') || ''
   };
 
-  return String(template || managerMessage(job, reason))
+  const body = String(template || managerMessage(job, reason, settings))
     .replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, key) => (Object.hasOwn(values, key) ? values[key] : match))
     .trim();
+
+  if (link && !body.includes(link)) return `${body}\nConversation: ${link}`;
+  return body;
 }
 
 function normalizeTelegramSendTarget(value) {
@@ -108,7 +131,7 @@ async function sendBlueBubblesManagerEscalations(settings, job, reason) {
     return result;
   }
 
-  const body = renderBlueBubblesEscalationMessage(settings.bluebubblesEscalationTemplate, job, reason);
+  const body = renderBlueBubblesEscalationMessage(settings.bluebubblesEscalationTemplate, job, reason, settings);
   result.message = body;
 
   for (const phone of phones) {
@@ -204,7 +227,7 @@ export async function escalateJobConcern({ job, reason, raw = {} }) {
     });
   } else {
     try {
-      const message = await botInstance.telegram.sendMessage(managerTarget.target, managerMessage(job, reason), {
+      const message = await botInstance.telegram.sendMessage(managerTarget.target, managerMessage(job, reason, settings), {
         disable_web_page_preview: true
       });
       telegramMessageId = String(message.message_id);

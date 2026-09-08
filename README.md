@@ -112,7 +112,7 @@ Set `LLM_PROVIDER=openai` and configure `OPENAI_API_KEY` plus `OPENAI_MODEL`, or
 
 Settings can also send concern summaries to managers/supervisors through BlueBubbles. Enable `BlueBubbles manager escalation`, add one or more phone numbers separated by commas or new lines, and edit the escalation SMS template.
 
-Template macros: `{{name}}`, `{{phone}}`, `{{primaryPhone}}`, `{{accountNumber}}`, `{{address}}`, `{{tech}}`, `{{techId}}`, `{{techTelegramId}}`, `{{telegramPoster}}`, `{{concern}}`, `{{jobId}}`.
+Template macros: `{{name}}`, `{{phone}}`, `{{primaryPhone}}`, `{{accountNumber}}`, `{{address}}`, `{{tech}}`, `{{techId}}`, `{{techTelegramId}}`, `{{telegramPoster}}`, `{{conversationLink}}`, `{{concern}}`, `{{jobId}}`.
 
 ## Security
 
