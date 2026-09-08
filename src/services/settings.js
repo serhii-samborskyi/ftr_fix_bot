@@ -29,6 +29,7 @@ Concern: {{concern}}`,
   llmProvider: config.llm.provider,
   ollamaBaseUrl: config.llm.ollamaBaseUrl,
   ollamaModel: config.llm.ollamaModel,
+  openaiModel: config.llm.openaiModel,
   geminiModel: config.llm.geminiModel,
   autoSendFollowup: String(config.autoSendFollowup),
   followupMaxAgentMessages: String(config.followup.maxAgentMessages),
@@ -72,6 +73,7 @@ const secretDefaults = {
   telegramBotToken: config.telegram.botToken,
   bluebubblesPassword: config.bluebubbles.password,
   bluebubblesWebhookSecret: config.bluebubbles.webhookSecret,
+  openaiApiKey: config.llm.openaiApiKey,
   geminiApiKey: config.llm.geminiApiKey
 };
 
@@ -138,6 +140,8 @@ export async function getRuntimeSettings() {
     llmProvider: merged.llmProvider,
     ollamaBaseUrl: merged.ollamaBaseUrl,
     ollamaModel: merged.ollamaModel,
+    openaiApiKey: merged.openaiApiKey,
+    openaiModel: merged.openaiModel,
     geminiApiKey: merged.geminiApiKey,
     geminiModel: merged.geminiModel,
     autoSendFollowup: parseBool(merged.autoSendFollowup, true),
@@ -188,6 +192,8 @@ export async function getPublicSettings() {
     llmProvider: settings.llmProvider,
     ollamaBaseUrl: settings.ollamaBaseUrl,
     ollamaModel: settings.ollamaModel,
+    openaiModel: settings.openaiModel,
+    openaiApiKeyConfigured: Boolean(settings.openaiApiKey),
     geminiModel: settings.geminiModel,
     geminiApiKeyConfigured: Boolean(settings.geminiApiKey),
     autoSendFollowup: settings.autoSendFollowup,
@@ -219,6 +225,7 @@ export async function updatePublicSettings(payload) {
     'llmProvider',
     'ollamaBaseUrl',
     'ollamaModel',
+    'openaiModel',
     'geminiModel',
     'autoSendFollowup',
     'followupMaxAgentMessages',
@@ -236,6 +243,7 @@ export async function updatePublicSettings(payload) {
   if (payload.bluebubblesPassword) await setSetting('bluebubblesPassword', payload.bluebubblesPassword);
   if (payload.bluebubblesWebhookSecret) await setSetting('bluebubblesWebhookSecret', payload.bluebubblesWebhookSecret);
   if (payload.telegramBotToken) await setSetting('telegramBotToken', payload.telegramBotToken);
+  if (payload.openaiApiKey) await setSetting('openaiApiKey', payload.openaiApiKey);
   if (payload.geminiApiKey) await setSetting('geminiApiKey', payload.geminiApiKey);
 
   return getPublicSettings();

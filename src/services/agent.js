@@ -1,4 +1,5 @@
 import { getRuntimeSettings } from './settings.js';
+import { createOpenAIResponse } from './openai.js';
 import { addWorkerLog } from './workerLogs.js';
 import { errorToLogMeta, truncateText } from '../utils/errors.js';
 
@@ -416,8 +417,15 @@ async function callGemini(settings, messages, json = false) {
 }
 
 async function callModel(settings, messages, json = false) {
+  if (settings.llmProvider === 'openai') return createOpenAIResponse(settings, messages, json);
   if (settings.llmProvider === 'gemini') return callGemini(settings, messages, json);
   return callOllama(settings, messages, json);
+}
+
+function selectedModel(settings) {
+  if (settings.llmProvider === 'openai') return settings.openaiModel;
+  if (settings.llmProvider === 'gemini') return settings.geminiModel;
+  return settings.ollamaModel;
 }
 
 function heuristicDecision(customerText) {
@@ -469,7 +477,7 @@ Only ask whether they were satisfied with the service visit.`
   } catch (error) {
     addWorkerLog('agent', 'warn', 'Initial follow-up model failed; using template', errorToLogMeta(error, {
       provider: settings.llmProvider,
-      model: settings.llmProvider === 'gemini' ? settings.geminiModel : settings.ollamaModel
+      model: selectedModel(settings)
     }));
     return fallback;
   }
@@ -526,7 +534,7 @@ Classify the latest reply. Return strict JSON only.`
   } catch (error) {
     addWorkerLog('agent', 'warn', 'Classification model failed; using heuristic', errorToLogMeta(error, {
       provider: settings.llmProvider,
-      model: settings.llmProvider === 'gemini' ? settings.geminiModel : settings.ollamaModel,
+      model: selectedModel(settings),
       jobId: job.id || ''
     }));
     return heuristicDecision(customerText);

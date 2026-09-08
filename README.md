@@ -61,6 +61,9 @@ BLUEBUBBLES_WEBHOOK_SECRET=change-this-webhook-secret
 BLUEBUBBLES_TYPING_INDICATORS_ENABLED=true
 BLUEBUBBLES_ESCALATION_ENABLED=false
 BLUEBUBBLES_ESCALATION_PHONES=
+LLM_PROVIDER=openai
+OPENAI_API_KEY=replace-with-openai-api-key
+OPENAI_MODEL=gpt-4.1-mini
 FOLLOWUP_REPLY_DELAY_MIN_SECONDS=5
 FOLLOWUP_REPLY_DELAY_MAX_SECONDS=10
 SKIP_PRISMA_MIGRATE=false
@@ -97,6 +100,10 @@ https://your-app-domain.example/webhooks/bluebubbles?secret=BLUEBUBBLES_WEBHOOK_
 Enable at least the `new-message` event.
 
 Automated agent replies wait for a random delay between `FOLLOWUP_REPLY_DELAY_MIN_SECONDS` and `FOLLOWUP_REPLY_DELAY_MAX_SECONDS`. When `BLUEBUBBLES_TYPING_INDICATORS_ENABLED=true`, the app sends BlueBubbles typing indicators for iMessage chats during that wait. SMS chats still use the delay, but SMS has no typing indicator support.
+
+## OpenAI Provider
+
+Set `LLM_PROVIDER=openai` and configure `OPENAI_API_KEY` plus `OPENAI_MODEL`, or enter them from Settings. The Settings page can load your available OpenAI model IDs from the OpenAI Models API after a key is configured.
 
 ## BlueBubbles Manager Escalation
 

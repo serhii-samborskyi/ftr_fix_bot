@@ -5,6 +5,7 @@ const state = {
   technicians: [],
   selectedJob: null,
   settings: null,
+  openAiModels: [],
   worker: null,
   chatMode: 'inbox',
   busyCount: 0
@@ -589,6 +590,24 @@ async function loadTechnicians() {
   renderTechnicians();
 }
 
+function renderOpenAiModels(models = []) {
+  const list = $('#openaiModelList');
+  if (!list) return;
+  list.innerHTML = models
+    .map((model) => `<option value="${escapeHtml(model.id)}">${escapeHtml(model.ownedBy || 'OpenAI')}</option>`)
+    .join('');
+}
+
+async function loadOpenAiModels({ apiKey = '' } = {}) {
+  const payload = await api('/api/settings/openai/models', {
+    method: 'POST',
+    body: JSON.stringify(apiKey ? { openaiApiKey: apiKey } : {})
+  });
+  state.openAiModels = payload.models || [];
+  renderOpenAiModels(state.openAiModels);
+  $('#settingsStatus').textContent = `Loaded ${state.openAiModels.length} OpenAI models.`;
+}
+
 async function loadSettings() {
   const payload = await api('/api/settings');
   const settings = payload.settings;
@@ -610,6 +629,7 @@ async function loadSettings() {
     'llmProvider',
     'ollamaBaseUrl',
     'ollamaModel',
+    'openaiModel',
     'geminiModel',
     'followupMaxAgentMessages',
     'followupConversationWindowDays',
@@ -630,8 +650,14 @@ async function loadSettings() {
     `Telegram token: ${settings.telegramBotTokenConfigured ? 'configured' : 'missing'}`,
     `BlueBubbles password: ${settings.bluebubblesPasswordConfigured ? 'configured' : 'missing'}`,
     `manager SMS: ${settings.bluebubblesEscalationEnabled ? 'enabled' : 'disabled'}`,
+    `OpenAI key: ${settings.openaiApiKeyConfigured ? 'configured' : 'missing'}`,
     `Gemini key: ${settings.geminiApiKeyConfigured ? 'configured' : 'missing'}`
   ].join(' - ');
+  if (settings.llmProvider === 'openai' && settings.openaiApiKeyConfigured) {
+    loadOpenAiModels().catch((error) => {
+      $('#settingsStatus').textContent = `OpenAI model list failed: ${error.message}`;
+    });
+  }
   await loadSystemStatus();
   await loadWorkerStatus();
 }
@@ -753,6 +779,8 @@ function collectSettings(formType) {
           'llmProvider',
           'ollamaBaseUrl',
           'ollamaModel',
+          'openaiModel',
+          'openaiApiKey',
           'geminiModel',
           'geminiApiKey',
           'followupMaxAgentMessages',
@@ -764,7 +792,9 @@ function collectSettings(formType) {
   for (const id of ids) {
     const element = $(`#${id}`);
     if (!element) continue;
-    if ((id.includes('Password') || id.includes('Secret') || id.includes('Token') || id === 'geminiApiKey') && !element.value) continue;
+    if ((id.includes('Password') || id.includes('Secret') || id.includes('Token') || id.endsWith('ApiKey')) && !element.value) {
+      continue;
+    }
     payload[id] = element.value;
   }
   if (formType !== 'prompt') {
@@ -1020,6 +1050,13 @@ function wireEvents() {
       } catch (error) {
         $('#settingsStatus').textContent = error.message;
       }
+    })
+  );
+
+  $('#loadOpenAiModelsBtn').addEventListener('click', (event) =>
+    withButtonLoading(event.currentTarget, 'Loading', async () => {
+      $('#settingsStatus').textContent = 'Loading OpenAI models...';
+      await loadOpenAiModels({ apiKey: $('#openaiApiKey').value.trim() });
     })
   );
 

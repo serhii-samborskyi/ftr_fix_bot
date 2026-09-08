@@ -177,11 +177,18 @@
               <select id="llmProvider">
                 <option value="ollama">Ollama</option>
                 <option value="gemini">Gemini</option>
+                <option value="openai">OpenAI</option>
                 <option value="disabled">Disabled fallback</option>
               </select>
             </label>
             <label>Ollama base URL <input id="ollamaBaseUrl" /></label>
             <label>Ollama model <input id="ollamaModel" /></label>
+            <label>OpenAI API key <input id="openaiApiKey" type="password" placeholder="Leave blank to keep current" /></label>
+            <div class="copy-row">
+              <label>OpenAI model <input id="openaiModel" list="openaiModelList" placeholder="gpt-4.1-mini" /></label>
+              <button type="button" class="secondary" id="loadOpenAiModelsBtn">Load models</button>
+            </div>
+            <datalist id="openaiModelList"></datalist>
             <label>Gemini model <input id="geminiModel" /></label>
             <label>Gemini API key <input id="geminiApiKey" type="password" placeholder="Leave blank to keep current" /></label>
             <label class="toggle"><input type="checkbox" id="autoSendFollowup" /> Auto-send follow-up after OCR</label>
@@ -211,6 +218,6 @@
     </div>
     <div class="global-busy hidden" id="globalBusy">Working</div>
     <div class="global-status hidden" id="globalStatus"></div>
-    <script src="/assets/app.js?v=20260907-reply-presence"></script>
+    <script src="/assets/app.js?v=20260907-openai"></script>
   </body>
 </html>

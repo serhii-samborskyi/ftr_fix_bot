@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { config } from '../config.js';
 import { query } from '../db.js';
 import { pingBlueBubbles } from '../services/bluebubbles.js';
+import { listOpenAIModels } from '../services/openai.js';
 import { addWorkerLog, getWorkerLogs } from '../services/workerLogs.js';
 import { errorToLogMeta } from '../utils/errors.js';
 import {
@@ -221,6 +222,21 @@ apiRouter.patch('/settings', async (req, res, next) => {
   try {
     res.json({ settings: await updatePublicSettings(req.body || {}) });
   } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.post('/settings/openai/models', async (req, res, next) => {
+  try {
+    const schema = z.object({
+      openaiApiKey: z.string().trim().optional()
+    });
+    const payload = schema.parse(req.body || {});
+    const models = await listOpenAIModels({ apiKey: payload.openaiApiKey });
+    addWorkerLog('agent', 'info', 'OpenAI models loaded', { count: String(models.length) });
+    res.json({ models });
+  } catch (error) {
+    addWorkerLog('agent', 'error', 'OpenAI models load failed', errorToLogMeta(error));
     next(error);
   }
 });
