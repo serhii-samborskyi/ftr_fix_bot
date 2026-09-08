@@ -592,20 +592,51 @@ async function loadTechnicians() {
 
 function renderOpenAiModels(models = []) {
   const list = $('#openaiModelList');
-  if (!list) return;
-  list.innerHTML = models
-    .map((model) => `<option value="${escapeHtml(model.id)}">${escapeHtml(model.ownedBy || 'OpenAI')}</option>`)
-    .join('');
+  const select = $('#openaiModelSelect');
+  if (list) {
+    list.innerHTML = models
+      .map((model) => `<option value="${escapeHtml(model.id)}">${escapeHtml(model.ownedBy || 'OpenAI')}</option>`)
+      .join('');
+  }
+  if (!select) return;
+
+  const currentModel = $('#openaiModel')?.value || '';
+  select.innerHTML =
+    '<option value="">Choose loaded model</option>' +
+    models
+      .map((model) => {
+        const selected = model.id === currentModel ? ' selected' : '';
+        return `<option value="${escapeHtml(model.id)}"${selected}>${escapeHtml(model.id)}</option>`;
+      })
+      .join('');
+  select.classList.toggle('hidden', !models.length);
+}
+
+function updateProviderSettingsVisibility() {
+  const provider = $('#llmProvider')?.value || 'ollama';
+  $$('[data-provider-settings]').forEach((panel) => {
+    panel.classList.toggle('hidden', panel.dataset.providerSettings !== provider);
+  });
 }
 
 async function loadOpenAiModels({ apiKey = '' } = {}) {
+  const status = $('#openaiModelStatus') || $('#settingsStatus');
+  const key = String(apiKey || '').trim();
+  if (!key && !state.settings?.openaiApiKeyConfigured) {
+    throw new Error('Enter an OpenAI API key, or save settings after adding one, then load models.');
+  }
+
+  status.textContent = 'Loading OpenAI models...';
   const payload = await api('/api/settings/openai/models', {
     method: 'POST',
-    body: JSON.stringify(apiKey ? { openaiApiKey: apiKey } : {})
+    body: JSON.stringify(key ? { openaiApiKey: key } : {})
   });
   state.openAiModels = payload.models || [];
   renderOpenAiModels(state.openAiModels);
-  $('#settingsStatus').textContent = `Loaded ${state.openAiModels.length} OpenAI models.`;
+  status.textContent = state.openAiModels.length
+    ? `Loaded ${state.openAiModels.length} OpenAI models.`
+    : 'OpenAI returned no models for this key.';
+  $('#settingsStatus').textContent = status.textContent;
 }
 
 async function loadSettings() {
@@ -646,6 +677,7 @@ async function loadSettings() {
   $('#bluebubblesTypingIndicatorsEnabled').checked = Boolean(settings.bluebubblesTypingIndicatorsEnabled);
   $('#bluebubblesEscalationEnabled').checked = Boolean(settings.bluebubblesEscalationEnabled);
   $('#autoSendFollowup').checked = Boolean(settings.autoSendFollowup);
+  updateProviderSettingsVisibility();
   $('#settingsStatus').textContent = [
     `Telegram token: ${settings.telegramBotTokenConfigured ? 'configured' : 'missing'}`,
     `BlueBubbles password: ${settings.bluebubblesPasswordConfigured ? 'configured' : 'missing'}`,
@@ -655,7 +687,9 @@ async function loadSettings() {
   ].join(' - ');
   if (settings.llmProvider === 'openai' && settings.openaiApiKeyConfigured) {
     loadOpenAiModels().catch((error) => {
-      $('#settingsStatus').textContent = `OpenAI model list failed: ${error.message}`;
+      const message = `OpenAI model list failed: ${error.message}`;
+      $('#openaiModelStatus').textContent = message;
+      $('#settingsStatus').textContent = message;
     });
   }
   await loadSystemStatus();
@@ -1053,10 +1087,23 @@ function wireEvents() {
     })
   );
 
+  $('#llmProvider').addEventListener('change', updateProviderSettingsVisibility);
+
+  $('#openaiModelSelect').addEventListener('change', (event) => {
+    if (!event.currentTarget.value) return;
+    $('#openaiModel').value = event.currentTarget.value;
+  });
+
   $('#loadOpenAiModelsBtn').addEventListener('click', (event) =>
     withButtonLoading(event.currentTarget, 'Loading', async () => {
-      $('#settingsStatus').textContent = 'Loading OpenAI models...';
-      await loadOpenAiModels({ apiKey: $('#openaiApiKey').value.trim() });
+      try {
+        await loadOpenAiModels({ apiKey: $('#openaiApiKey').value.trim() });
+      } catch (error) {
+        const message = `OpenAI model list failed: ${error.message}`;
+        $('#openaiModelStatus').textContent = message;
+        $('#settingsStatus').textContent = message;
+        throw error;
+      }
     })
   );
 

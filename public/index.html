@@ -181,16 +181,27 @@
                 <option value="disabled">Disabled fallback</option>
               </select>
             </label>
-            <label>Ollama base URL <input id="ollamaBaseUrl" /></label>
-            <label>Ollama model <input id="ollamaModel" /></label>
-            <label>OpenAI API key <input id="openaiApiKey" type="password" placeholder="Leave blank to keep current" /></label>
-            <div class="copy-row">
-              <label>OpenAI model <input id="openaiModel" list="openaiModelList" placeholder="gpt-4.1-mini" /></label>
-              <button type="button" class="secondary" id="loadOpenAiModelsBtn">Load models</button>
+            <div class="provider-settings" data-provider-settings="ollama">
+              <label>Ollama base URL <input id="ollamaBaseUrl" /></label>
+              <label>Ollama model <input id="ollamaModel" /></label>
             </div>
-            <datalist id="openaiModelList"></datalist>
-            <label>Gemini model <input id="geminiModel" /></label>
-            <label>Gemini API key <input id="geminiApiKey" type="password" placeholder="Leave blank to keep current" /></label>
+            <div class="provider-settings hidden" data-provider-settings="openai">
+              <label>OpenAI API key <input id="openaiApiKey" type="password" placeholder="Leave blank to keep current" /></label>
+              <div class="copy-row">
+                <label>OpenAI model <input id="openaiModel" list="openaiModelList" placeholder="gpt-4.1-mini" /></label>
+                <button type="button" class="secondary" id="loadOpenAiModelsBtn">Load models</button>
+              </div>
+              <select class="hidden" id="openaiModelSelect" aria-label="Loaded OpenAI models"></select>
+              <datalist id="openaiModelList"></datalist>
+              <p class="muted" id="openaiModelStatus"></p>
+            </div>
+            <div class="provider-settings hidden" data-provider-settings="gemini">
+              <label>Gemini model <input id="geminiModel" /></label>
+              <label>Gemini API key <input id="geminiApiKey" type="password" placeholder="Leave blank to keep current" /></label>
+            </div>
+            <div class="provider-settings hidden" data-provider-settings="disabled">
+              <p class="muted">Model calls are disabled. The app will use built-in fallback rules.</p>
+            </div>
             <label class="toggle"><input type="checkbox" id="autoSendFollowup" /> Auto-send follow-up after OCR</label>
             <label>Max agent messages <input id="followupMaxAgentMessages" type="number" min="1" max="50" /></label>
             <label>Conversation window days <input id="followupConversationWindowDays" type="number" min="1" max="3650" /></label>
@@ -218,6 +229,6 @@
     </div>
     <div class="global-busy hidden" id="globalBusy">Working</div>
     <div class="global-status hidden" id="globalStatus"></div>
-    <script src="/assets/app.js?v=20260907-openai"></script>
+    <script src="/assets/app.js?v=20260907-provider-panels"></script>
   </body>
 </html>

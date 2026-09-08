@@ -71,11 +71,13 @@ export async function openAIRequest(path, options = {}) {
   if (!apiKey) throw new Error('OpenAI API key is not configured.');
 
   const method = requestedMethod || (fetchOptions.body ? 'POST' : 'GET');
+  const signal = fetchOptions.signal || AbortSignal.timeout(20000);
   let response;
   try {
     response = await fetch(`${openAIBaseUrl}${path}`, {
       ...fetchOptions,
       method,
+      signal,
       headers: {
         Authorization: `Bearer ${apiKey}`,
         ...(fetchOptions.body ? { 'Content-Type': 'application/json' } : {}),
