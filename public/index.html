@@ -181,6 +181,13 @@
                 <option value="disabled">Disabled fallback</option>
               </select>
             </label>
+            <label>Classification mode
+              <select id="classificationMode">
+                <option value="ai_only">AI only</option>
+                <option value="hybrid">Hybrid</option>
+                <option value="rules_only">Rules only</option>
+              </select>
+            </label>
             <div class="provider-settings" data-provider-settings="ollama">
               <label>Ollama base URL <input id="ollamaBaseUrl" /></label>
               <label>Ollama model <input id="ollamaModel" /></label>
@@ -229,6 +236,6 @@
     </div>
     <div class="global-busy hidden" id="globalBusy">Working</div>
     <div class="global-status hidden" id="globalStatus"></div>
-    <script src="/assets/app.js?v=20260907-provider-panels"></script>
+    <script src="/assets/app.js?v=20260907-classification-mode"></script>
   </body>
 </html>

@@ -62,6 +62,7 @@ BLUEBUBBLES_TYPING_INDICATORS_ENABLED=true
 BLUEBUBBLES_ESCALATION_ENABLED=false
 BLUEBUBBLES_ESCALATION_PHONES=
 LLM_PROVIDER=openai
+CLASSIFICATION_MODE=ai_only
 OPENAI_API_KEY=replace-with-openai-api-key
 OPENAI_MODEL=gpt-4.1-mini
 FOLLOWUP_REPLY_DELAY_MIN_SECONDS=5
@@ -104,6 +105,8 @@ Automated agent replies wait for a random delay between `FOLLOWUP_REPLY_DELAY_MI
 ## OpenAI Provider
 
 Set `LLM_PROVIDER=openai` and configure `OPENAI_API_KEY` plus `OPENAI_MODEL`, or enter them from Settings. The Settings page can load your available OpenAI model IDs from the OpenAI Models API after a key is configured.
+
+`CLASSIFICATION_MODE=ai_only` sends customer replies and conversation history directly to the configured AI provider for classification. `hybrid` runs built-in rules before AI, and `rules_only` disables AI classification.
 
 ## BlueBubbles Manager Escalation
 

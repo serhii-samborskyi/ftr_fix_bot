@@ -55,6 +55,7 @@ export const config = {
   },
   llm: {
     provider: process.env.LLM_PROVIDER || 'ollama',
+    classificationMode: process.env.CLASSIFICATION_MODE || 'ai_only',
     ollamaBaseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
     ollamaModel: process.env.OLLAMA_MODEL || 'qwen2.5:7b',
     openaiApiKey: process.env.OPENAI_API_KEY || '',

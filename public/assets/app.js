@@ -658,6 +658,7 @@ async function loadSettings() {
     'bluebubblesEscalationTemplate',
     'bluebubblesWebhookUrl',
     'llmProvider',
+    'classificationMode',
     'ollamaBaseUrl',
     'ollamaModel',
     'openaiModel',
@@ -682,6 +683,7 @@ async function loadSettings() {
     `Telegram token: ${settings.telegramBotTokenConfigured ? 'configured' : 'missing'}`,
     `BlueBubbles password: ${settings.bluebubblesPasswordConfigured ? 'configured' : 'missing'}`,
     `manager SMS: ${settings.bluebubblesEscalationEnabled ? 'enabled' : 'disabled'}`,
+    `classification: ${settings.classificationMode || 'ai_only'}`,
     `OpenAI key: ${settings.openaiApiKeyConfigured ? 'configured' : 'missing'}`,
     `Gemini key: ${settings.geminiApiKeyConfigured ? 'configured' : 'missing'}`
   ].join(' - ');
@@ -811,6 +813,7 @@ function collectSettings(formType) {
           'bluebubblesEscalationPhones',
           'bluebubblesEscalationTemplate',
           'llmProvider',
+          'classificationMode',
           'ollamaBaseUrl',
           'ollamaModel',
           'openaiModel',

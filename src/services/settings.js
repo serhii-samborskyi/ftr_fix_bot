@@ -27,6 +27,7 @@ Address: {{address}}
 Technician: {{tech}}
 Concern: {{concern}}`,
   llmProvider: config.llm.provider,
+  classificationMode: config.llm.classificationMode,
   ollamaBaseUrl: config.llm.ollamaBaseUrl,
   ollamaModel: config.llm.ollamaModel,
   openaiModel: config.llm.openaiModel,
@@ -94,6 +95,11 @@ function parseNonNegativeNumber(value, fallback, max = 300) {
   return Math.min(max, Math.max(0, parsed));
 }
 
+function parseClassificationMode(value) {
+  const mode = String(value || '').trim();
+  return ['ai_only', 'hybrid', 'rules_only'].includes(mode) ? mode : 'ai_only';
+}
+
 export async function getSetting(key, fallback = '') {
   const result = await query('SELECT value FROM settings WHERE key = $1', [key]);
   if (result.rows[0]) return result.rows[0].value;
@@ -138,6 +144,7 @@ export async function getRuntimeSettings() {
     bluebubblesEscalationPhones: merged.bluebubblesEscalationPhones,
     bluebubblesEscalationTemplate: merged.bluebubblesEscalationTemplate,
     llmProvider: merged.llmProvider,
+    classificationMode: parseClassificationMode(merged.classificationMode),
     ollamaBaseUrl: merged.ollamaBaseUrl,
     ollamaModel: merged.ollamaModel,
     openaiApiKey: merged.openaiApiKey,
@@ -190,6 +197,7 @@ export async function getPublicSettings() {
     bluebubblesEscalationPhones: settings.bluebubblesEscalationPhones,
     bluebubblesEscalationTemplate: settings.bluebubblesEscalationTemplate,
     llmProvider: settings.llmProvider,
+    classificationMode: settings.classificationMode,
     ollamaBaseUrl: settings.ollamaBaseUrl,
     ollamaModel: settings.ollamaModel,
     openaiModel: settings.openaiModel,
@@ -223,6 +231,7 @@ export async function updatePublicSettings(payload) {
     'bluebubblesEscalationPhones',
     'bluebubblesEscalationTemplate',
     'llmProvider',
+    'classificationMode',
     'ollamaBaseUrl',
     'ollamaModel',
     'openaiModel',

@@ -436,17 +436,39 @@ function heuristicDecision(customerText) {
   };
 }
 
+function rulesFallbackDecision({ job = {}, conversation = [], customerText = '' } = {}) {
+  return deterministicDecision({ job, conversation, customerText }) || heuristicDecision(customerText);
+}
+
+function normalizeClassificationMode(value) {
+  const mode = String(value || '').trim();
+  return ['ai_only', 'hybrid', 'rules_only'].includes(mode) ? mode : 'ai_only';
+}
+
 export async function buildInitialFollowup(job) {
   const settings = await getRuntimeSettings();
   return renderTemplate(settings.initialMessageTemplate, job);
 }
 
 export async function classifyCustomerReply({ job, conversation, customerText }) {
-  const deterministic = deterministicDecision({ job, conversation, customerText });
-  if (deterministic) return deterministic;
-
   const settings = await getRuntimeSettings();
-  if (!settings.llmProvider || settings.llmProvider === 'disabled') return heuristicDecision(customerText);
+  const classificationMode = normalizeClassificationMode(settings.classificationMode);
+
+  if (classificationMode === 'rules_only') return rulesFallbackDecision({ job, conversation, customerText });
+
+  if (classificationMode === 'hybrid') {
+    const deterministic = deterministicDecision({ job, conversation, customerText });
+    if (deterministic) return deterministic;
+  }
+
+  if (!settings.llmProvider || settings.llmProvider === 'disabled') {
+    addWorkerLog('agent', 'warn', 'AI classification requested without an enabled provider; using fallback rules', {
+      classificationMode,
+      provider: settings.llmProvider || 'disabled',
+      jobId: job.id || ''
+    });
+    return rulesFallbackDecision({ job, conversation, customerText });
+  }
 
   const transcript = conversation
     .map((message) => `${message.direction === 'outbound' ? 'Agent' : 'Customer'}: ${message.body}`)
@@ -488,13 +510,16 @@ Classify the latest reply. Return strict JSON only.`
       ],
       true
     );
-    return preventRepeatedFollowup(extractJsonObject(content), conversation, customerText);
+    const parsed = extractJsonObject(content);
+    if (!parsed) throw new Error(`Classification model returned invalid JSON: ${truncateText(content, 700)}`);
+    return preventRepeatedFollowup(parsed, conversation, customerText);
   } catch (error) {
-    addWorkerLog('agent', 'warn', 'Classification model failed; using heuristic', errorToLogMeta(error, {
+    addWorkerLog('agent', 'warn', 'Classification model failed; using fallback rules', errorToLogMeta(error, {
+      classificationMode,
       provider: settings.llmProvider,
       model: selectedModel(settings),
       jobId: job.id || ''
     }));
-    return heuristicDecision(customerText);
+    return rulesFallbackDecision({ job, conversation, customerText });
   }
 }
