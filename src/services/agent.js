@@ -91,9 +91,6 @@ const satisfiedPatterns = [
   /\bworks?\s+(now|great|good|fine)\b/
 ];
 
-const initialSystemPrompt =
-  'You write brief customer service SMS follow-up messages. Return only the message text. Do not return JSON, markdown, labels, or metadata.';
-
 function renderTemplate(template, job) {
   const fullName = job.customer_name || job.customerName || '';
   return String(template || '')
@@ -123,38 +120,6 @@ export function greetingName(fullName) {
 
 function jobValue(job, camelKey, snakeKey = camelKey) {
   return job?.[camelKey] || job?.[snakeKey] || '';
-}
-
-function escapeRegExp(value) {
-  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function useGreetingName(message, fullName) {
-  const full = String(fullName || '').trim();
-  const first = greetingName(full);
-  if (!full || first === full) return message;
-  return String(message || '').replace(new RegExp(`\\b${escapeRegExp(full)}\\b`, 'i'), first);
-}
-
-function initialReplyText(content) {
-  const parsed = extractJsonObject(content);
-  if (parsed) return String(parsed.reply || parsed.message || parsed.text || '').trim();
-  return String(content || '').trim();
-}
-
-function cleanInitialFollowup(content, fallback, { requiredText = '', fullName = '' } = {}) {
-  const text = initialReplyText(content).trim().replace(/^["']|["']$/g, '');
-  const lower = text.toLowerCase();
-  const required = String(requiredText || '').trim().toLowerCase();
-
-  if (!text) return fallback;
-  if (lower.includes('missing information')) return fallback;
-  if (lower.includes('provide') && (lower.includes('customer') || lower.includes('name') || lower.includes('address'))) {
-    return fallback;
-  }
-  if (required && String(fallback || '').toLowerCase().includes(required) && !lower.includes(required)) return fallback;
-
-  return useGreetingName(text, fullName);
 }
 
 function extractJsonObject(text) {
@@ -461,43 +426,7 @@ function heuristicDecision(customerText) {
 
 export async function buildInitialFollowup(job) {
   const settings = await getRuntimeSettings();
-  const fallback = renderTemplate(settings.initialMessageTemplate, job);
-  const fullName = jobValue(job, 'customerName', 'customer_name');
-  const firstName = greetingName(fullName);
-
-  if (!settings.llmProvider || settings.llmProvider === 'disabled') return fallback;
-
-  try {
-    const content = await callModel(settings, [
-      { role: 'system', content: initialSystemPrompt },
-      {
-        role: 'user',
-        content: `Write one short initial SMS follow-up for this customer. Return plain SMS text only. Do not return JSON.
-Customer full name: ${fullName || 'there'}
-Customer greeting name: ${firstName}
-Phone: ${jobValue(job, 'phone')}
-Primary phone: ${jobValue(job, 'primaryPhone', 'primary_phone')}
-Account: ${jobValue(job, 'accountNumber', 'account_number')}
-Address: ${jobValue(job, 'address') || 'the service address'}
-Technician: ${jobValue(job, 'techName', 'tech_name') || 'technician'}
-
-Use the customer greeting name in the greeting. Do not greet with the full name.
-Do not ask the customer to provide their name, address, account number, or other internal job details.
-If no technician name is available, refer to the technician as "technician".
-Only ask whether they were satisfied with the service visit.`
-      }
-    ]);
-    return cleanInitialFollowup(content, fallback, {
-      requiredText: jobValue(job, 'techName', 'tech_name'),
-      fullName
-    });
-  } catch (error) {
-    addWorkerLog('agent', 'warn', 'Initial follow-up model failed; using template', errorToLogMeta(error, {
-      provider: settings.llmProvider,
-      model: selectedModel(settings)
-    }));
-    return fallback;
-  }
+  return renderTemplate(settings.initialMessageTemplate, job);
 }
 
 export async function classifyCustomerReply({ job, conversation, customerText }) {
