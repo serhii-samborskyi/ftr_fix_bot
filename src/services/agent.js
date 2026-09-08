@@ -91,6 +91,9 @@ const satisfiedPatterns = [
   /\bworks?\s+(now|great|good|fine)\b/
 ];
 
+const initialSystemPrompt =
+  'You write brief customer service SMS follow-up messages. Return only the message text. Do not return JSON, markdown, labels, or metadata.';
+
 function renderTemplate(template, job) {
   const fullName = job.customer_name || job.customerName || '';
   return String(template || '')
@@ -133,8 +136,14 @@ function useGreetingName(message, fullName) {
   return String(message || '').replace(new RegExp(`\\b${escapeRegExp(full)}\\b`, 'i'), first);
 }
 
+function initialReplyText(content) {
+  const parsed = extractJsonObject(content);
+  if (parsed) return String(parsed.reply || parsed.message || parsed.text || '').trim();
+  return String(content || '').trim();
+}
+
 function cleanInitialFollowup(content, fallback, { requiredText = '', fullName = '' } = {}) {
-  const text = String(content || '').trim().replace(/^["']|["']$/g, '');
+  const text = initialReplyText(content).trim().replace(/^["']|["']$/g, '');
   const lower = text.toLowerCase();
   const required = String(requiredText || '').trim().toLowerCase();
 
@@ -231,6 +240,10 @@ function jobIsSatisfied(job) {
   return job?.status === 'satisfied' || job?.followupStatus === 'satisfied' || job?.followup_status === 'satisfied';
 }
 
+function jobIsConcern(job) {
+  return job?.status === 'concern' || job?.followupStatus === 'concern' || job?.followup_status === 'concern';
+}
+
 function isLowInformationPostCloseReply(text) {
   const raw = String(text || '').trim();
   const lower = normalizeText(raw);
@@ -289,6 +302,10 @@ function satisfiedDecision(reply = 'Thanks for confirming. Have a good day.') {
 export function deterministicDecision({ job = {}, conversation = [], customerText = '' } = {}) {
   const lastAgentText = lastOutboundMessage(conversation)?.body || '';
   const hasDetails = normalizeText(customerText).split(' ').length > 2;
+
+  if (jobIsConcern(job) && hasConcernSignal(customerText)) {
+    return { status: 'concern', reply: '', concernSummary: customerText };
+  }
 
   if (hasConcernSignal(customerText)) return concernDecision(customerText);
 
@@ -452,10 +469,10 @@ export async function buildInitialFollowup(job) {
 
   try {
     const content = await callModel(settings, [
-      { role: 'system', content: settings.systemPrompt },
+      { role: 'system', content: initialSystemPrompt },
       {
         role: 'user',
-        content: `Write one short initial SMS follow-up for this customer. No JSON.
+        content: `Write one short initial SMS follow-up for this customer. Return plain SMS text only. Do not return JSON.
 Customer full name: ${fullName || 'there'}
 Customer greeting name: ${firstName}
 Phone: ${jobValue(job, 'phone')}

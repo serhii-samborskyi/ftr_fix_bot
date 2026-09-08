@@ -142,7 +142,48 @@ async function sendBlueBubblesManagerEscalations(settings, job, reason) {
   return result;
 }
 
+async function getPriorEscalation(jobId) {
+  const result = await query(
+    `
+      SELECT jobs.escalated_at, escalations.id AS escalation_id
+      FROM jobs
+      LEFT JOIN escalations ON escalations.job_id = jobs.id
+      WHERE jobs.id = $1
+      ORDER BY escalations.created_at ASC
+      LIMIT 1
+    `,
+    [jobId]
+  );
+  return result.rows[0] || null;
+}
+
 export async function escalateJobConcern({ job, reason, raw = {} }) {
+  const priorEscalation = await getPriorEscalation(job.id);
+  if (priorEscalation?.escalated_at || priorEscalation?.escalation_id) {
+    await query(
+      `
+        UPDATE jobs
+        SET status = 'concern',
+            followup_status = 'concern',
+            updated_at = now()
+        WHERE id = $1
+      `,
+      [job.id]
+    );
+    addWorkerLog('agent', 'info', 'Escalation already sent; skipping duplicate manager notification', {
+      jobId: job.id,
+      escalationId: priorEscalation.escalation_id || '',
+      escalatedAt: priorEscalation.escalated_at ? String(priorEscalation.escalated_at) : ''
+    });
+    return {
+      skipped: true,
+      reason: 'already_escalated',
+      telegramMessageId: null,
+      bluebubblesEscalation: null,
+      sendError: null
+    };
+  }
+
   const settings = await getRuntimeSettings();
   let telegramMessageId = null;
   let telegramError = null;
