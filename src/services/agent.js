@@ -73,7 +73,8 @@ const concernPatterns = [
   /\b(doesn'?t|does not|isn'?t|is not|won'?t|will not|cant|can't|cannot|can not)\s+(work|working|turn on|connect|respond|function)\b/,
   /\b(can|could)\s+you\s+(help|send|fix|check)\b/,
   /\b(stopped|quit)\s+working\b/,
-  /\bstill\s+(not|broken|down|out|loose|hanging|bad|wrong|doesn'?t|isn'?t)\b/,
+  /\bstill\s+(not|broken|down|out|loose|hanging|bad|wrong|doesn'?t|isn'?t|dropping|drops?|disconnecting|disconnects?)\b/,
+  /\b(keeps?|continues?|continued)\s+(dropping|disconnecting|failing|going out)\b/,
   /\b(left|leaving)\b.*\b(wire|wires|cable|line|trash|mess|equipment|box|yard|backyard)\b/,
   /\b(wire|wires|cable|line|equipment|box)\b.*\b(left|loose|hanging|outside|yard|backyard|damaged|broken)\b/,
   /\b(damage|damaged|broken|hole|mess|trash|unsafe|dangerous)\b/,
@@ -89,6 +90,12 @@ const satisfiedPatterns = [
   /\ball\s+(good|set|fixed|working)\b/,
   /\beverything\s+(is\s+)?(good|fine|working|works)\b/,
   /\bworks?\s+(now|great|good|fine)\b/
+];
+
+const positiveResolutionPatterns = [
+  /\b(did\s+)?(find|found|fix|fixed|solve|solved|resolve|resolved|identify|identified)\b.*\b(problem|problems|issue|issues)\b.*\b(happy|satisfied|good|great|fine|ok|okay|all\s+set)\b/,
+  /\b(problem|problems|issue|issues)\b.*\b(found|fixed|solved|resolved|identified)\b.*\b(happy|satisfied|good|great|fine|ok|okay|all\s+set)\b/,
+  /\b(he|she|tech|technician)\b.*\b(found|fixed|solved|resolved|identified)\b.*\b(problem|problems|issue|issues)\b.*\b(happy|satisfied|good|great|fine|ok|okay|all\s+set)\b/
 ];
 
 function renderTemplate(template, job) {
@@ -235,13 +242,18 @@ function hasConcernSignal(text) {
   if (!lower) return false;
   if (concernPatterns.some((pattern) => pattern.test(lower))) return true;
   if (satisfiedPatterns.some((pattern) => pattern.test(lower))) return false;
+  if (positiveResolutionPatterns.some((pattern) => pattern.test(lower))) return false;
   return concernKeywords.some((word) => lower.includes(word));
 }
 
 function hasSatisfiedSignal(text) {
   const lower = normalizeText(text);
   if (!lower) return false;
-  return satisfiedPatterns.some((pattern) => pattern.test(lower)) || satisfiedKeywords.some((word) => lower.includes(word));
+  return (
+    satisfiedPatterns.some((pattern) => pattern.test(lower)) ||
+    positiveResolutionPatterns.some((pattern) => pattern.test(lower)) ||
+    satisfiedKeywords.some((word) => lower.includes(word))
+  );
 }
 
 function concernDecision(customerText) {
