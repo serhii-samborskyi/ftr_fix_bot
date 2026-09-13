@@ -286,10 +286,21 @@ textarea {
 .stat-card {
   display: grid;
   gap: 4px;
+  width: 100%;
+  min-height: 76px;
   background: var(--surface);
+  color: var(--ink);
   border: 1px solid var(--line);
   border-radius: 8px;
+  box-shadow: none;
   padding: 12px;
+  text-align: left;
+}
+
+.stat-card.active,
+.stat-card:focus-visible {
+  border-color: var(--brand);
+  box-shadow: inset 0 0 0 2px var(--brand);
 }
 
 .stat-card strong {
@@ -366,6 +377,15 @@ textarea {
 .badge.danger {
   background: #ffe4e4;
   color: var(--danger);
+}
+
+.badge.muted {
+  color: var(--muted);
+}
+
+.conversation-status {
+  justify-self: start;
+  text-transform: none;
 }
 
 .split {
@@ -517,6 +537,8 @@ textarea {
 
 .chat-section-header {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: 4px;
   padding: 14px;
   background: var(--surface);
@@ -524,6 +546,12 @@ textarea {
 
 .chat-section-header strong {
   font-size: 22px;
+}
+
+.chat-section-header small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
 }
 
 .recent-chat-list {

@@ -38,7 +38,8 @@ function filterParams(req) {
     range: String(req.query.range || 'today'),
     from: String(req.query.from || ''),
     to: String(req.query.to || ''),
-    techId: String(req.query.techId || '')
+    techId: String(req.query.techId || ''),
+    status: String(req.query.status || '')
   };
 }
 

@@ -8,6 +8,7 @@ const state = {
   openAiModels: [],
   worker: null,
   chatMode: 'inbox',
+  chatStatusFilter: 'all',
   busyCount: 0
 };
 
@@ -126,6 +127,12 @@ function currentFilterParams() {
   return params;
 }
 
+function conversationFilterParams() {
+  const params = currentFilterParams();
+  if (state.chatStatusFilter && state.chatStatusFilter !== 'all') params.set('status', state.chatStatusFilter);
+  return params;
+}
+
 function statusClass(job) {
   if (job.status === 'concern' || job.followupStatus === 'failed' || job.followupStatus === 'delivery_failed') return 'danger';
   if (job.status === 'satisfied') return 'success';
@@ -174,6 +181,46 @@ function serviceBadgeHtml(service) {
   return `<span class="service-badge ${chatServiceClass(label)}">${escapeHtml(label)}</span>`;
 }
 
+function conversationStatus(job = {}) {
+  if (job.status === 'concern' || job.followupStatus === 'concern' || job.escalatedAt) {
+    return { label: 'Escalation', className: 'danger', filter: 'escalations' };
+  }
+  if (job.status === 'satisfied' || job.followupStatus === 'satisfied') {
+    return { label: 'Satisfied', className: 'success', filter: 'satisfactions' };
+  }
+  if (job.followupStatus === 'failed' || job.followupStatus === 'delivery_failed') {
+    return { label: 'Failed', className: 'danger', filter: 'followups' };
+  }
+  if (job.followupStatus === 'delivery_pending') {
+    return { label: 'Pending', className: 'warn', filter: 'followups' };
+  }
+  if (job.followupStatus === 'limit_reached') {
+    return { label: 'Limit reached', className: 'warn', filter: 'followups' };
+  }
+  if (job.followupStatus && job.followupStatus !== 'not_started') {
+    return { label: 'Follow-up', className: '', filter: 'followups' };
+  }
+  return { label: 'Not started', className: 'muted', filter: 'all' };
+}
+
+function conversationStatusBadgeHtml(job) {
+  const status = conversationStatus(job);
+  return `<span class="badge conversation-status ${status.className}">${escapeHtml(status.label)}</span>`;
+}
+
+function chatFilterLabel(filter = state.chatStatusFilter) {
+  if (filter === 'followups') return 'Follow-ups';
+  if (filter === 'satisfactions') return 'Satisfactions';
+  if (filter === 'escalations') return 'Escalations';
+  return 'Recent chats';
+}
+
+function syncStatCardState() {
+  $$('[data-chat-status-filter]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.chatStatusFilter === state.chatStatusFilter);
+  });
+}
+
 function setConversationServiceBadge(service) {
   const badge = $('#conversationServiceBadge');
   if (!badge) return;
@@ -200,6 +247,22 @@ function showChatInbox() {
   $('#chatInboxPane')?.classList.remove('hidden');
   $('#chatThreadPane')?.classList.add('hidden');
   if ($('#conversationView')?.classList.contains('active')) $('#viewTitle').textContent = 'Chat';
+}
+
+function renderChatFilterHeader() {
+  const active = state.chatStatusFilter && state.chatStatusFilter !== 'all';
+  $('#recentChatTitle').textContent = chatFilterLabel();
+  $('#recentChatFilterMeta').textContent = active ? 'Filtered by current date range and technician' : '';
+  $('#clearChatFilterBtn').classList.toggle('hidden', !active);
+}
+
+async function openConversationFilter(filter = 'all') {
+  state.chatStatusFilter = filter || 'all';
+  syncStatCardState();
+  await loadRecentConversations();
+  showView('conversationView', 'Chat');
+  showChatInbox();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function resizeChatThread() {
@@ -235,22 +298,28 @@ function showChatThread() {
 function renderStats(stats) {
   const summary = stats?.summary || {};
   const cards = [
-    ['jobs', 'Jobs'],
-    ['followups', 'Follow-ups'],
-    ['satisfactions', 'Satisfactions'],
-    ['escalations', 'Escalations']
+    ['jobs', 'Jobs', 'all'],
+    ['followups', 'Follow-ups', 'followups'],
+    ['satisfactions', 'Satisfactions', 'satisfactions'],
+    ['escalations', 'Escalations', 'escalations']
   ];
 
   $('#dashboardStats').innerHTML = cards
     .map(
-      ([key, label]) => `
-        <article class="stat-card">
+      ([key, label, filter]) => `
+        <button type="button" class="stat-card ${state.chatStatusFilter === filter ? 'active' : ''}" data-chat-status-filter="${filter}">
           <span>${label}</span>
           <strong>${Number(summary[key] || 0)}</strong>
-        </article>
+        </button>
       `
     )
     .join('');
+
+  $$('[data-chat-status-filter]').forEach((button) => {
+    button.addEventListener('click', () =>
+      withButtonLoading(button, '', () => openConversationFilter(button.dataset.chatStatusFilter))
+    );
+  });
 
   const byTech = stats?.byTech || [];
   $('#techStats').innerHTML = byTech.length
@@ -468,8 +537,10 @@ async function loadConversation(id = state.selectedJob?.id) {
 
 function renderRecentConversations(items = []) {
   const list = $('#recentChatList');
+  renderChatFilterHeader();
+  syncStatCardState();
   if (!items.length) {
-    list.innerHTML = '<div class="empty compact">No recent conversations in this range.</div>';
+    list.innerHTML = `<div class="empty compact">No ${escapeHtml(chatFilterLabel().toLowerCase())} in this range.</div>`;
     return;
   }
 
@@ -484,6 +555,7 @@ function renderRecentConversations(items = []) {
               <strong>${escapeHtml(job.customerName || 'Unknown customer')}</strong>
               <small>${formatDate(lastMessage?.createdAt)}</small>
             </span>
+            ${conversationStatusBadgeHtml(job)}
             <span class="recent-chat-preview">${escapeHtml(lastMessage?.body || '')}</span>
             <small>${escapeHtml(phoneSummary(job))} - ${escapeHtml(techLabel(job))}${job.aiIgnore ? ' - AI ignored' : ''}</small>
           </span>
@@ -499,7 +571,7 @@ function renderRecentConversations(items = []) {
 }
 
 async function loadRecentConversations() {
-  const payload = await api(`/api/conversations/recent?${currentFilterParams()}`);
+  const payload = await api(`/api/conversations/recent?${conversationFilterParams()}`);
   renderRecentConversations(payload.conversations || []);
 }
 
@@ -882,6 +954,10 @@ function wireEvents() {
     );
   });
 
+  $('#clearChatFilterBtn').addEventListener('click', (event) =>
+    withButtonLoading(event.currentTarget, 'Loading', () => openConversationFilter('all'))
+  );
+
   $$('.chip').forEach((chip) => {
     chip.addEventListener('click', () =>
       withButtonLoading(chip, '', async () => {
@@ -906,8 +982,15 @@ function wireEvents() {
     }
   });
 
-  $('#fromDate').addEventListener('change', refreshMainData);
-  $('#toDate').addEventListener('change', refreshMainData);
+  const refreshDateFilters = async () => {
+    await refreshMainData();
+    if ($('#conversationView').classList.contains('active')) {
+      await loadRecentConversations();
+      if (state.chatMode === 'thread' && state.selectedJob) await loadConversation(state.selectedJob.id);
+    }
+  };
+  $('#fromDate').addEventListener('change', refreshDateFilters);
+  $('#toDate').addEventListener('change', refreshDateFilters);
   $('#refreshBtn').addEventListener('click', (event) =>
     withButtonLoading(event.currentTarget, 'Refreshing', async () => {
       await loadSettings();

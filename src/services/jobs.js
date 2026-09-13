@@ -1018,8 +1018,28 @@ export async function getConversation(jobId) {
   }));
 }
 
-export async function listRecentConversations({ range = 'today', from = '', to = '', techId = '' } = {}) {
+function conversationStatusClause(status = '') {
+  const value = String(status || '').trim();
+  if (['followups', 'followup', 'follow-up'].includes(value)) {
+    return "(jobs.followup_status <> 'not_started' OR outbound.job_id IS NOT NULL)";
+  }
+  if (['satisfactions', 'satisfied', 'satisfaction'].includes(value)) {
+    return "(jobs.followup_status = 'satisfied' OR jobs.status = 'satisfied')";
+  }
+  if (['escalations', 'escalation', 'concern'].includes(value)) {
+    return "(jobs.followup_status = 'concern' OR jobs.status = 'concern' OR escalated.job_id IS NOT NULL)";
+  }
+  return '';
+}
+
+export async function listRecentConversations({ range = 'today', from = '', to = '', techId = '', status = '' } = {}) {
   const filter = await jobFilters({ range, from, to, techId });
+  const clauses = [];
+  if (filter.where) clauses.push(filter.where.replace(/^WHERE\s+/i, ''));
+  const statusClause = conversationStatusClause(status);
+  if (statusClause) clauses.push(statusClause);
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+
   const result = await query(
     `
       SELECT ${jobSelect},
@@ -1031,6 +1051,8 @@ export async function listRecentConversations({ range = 'today', from = '', to =
              latest.created_at AS last_message_created_at
       FROM jobs
       ${jobTechJoin}
+      LEFT JOIN (SELECT DISTINCT job_id FROM conversations WHERE direction = 'outbound') outbound ON outbound.job_id = jobs.id
+      LEFT JOIN (SELECT DISTINCT job_id FROM escalations) escalated ON escalated.job_id = jobs.id
       JOIN LATERAL (
         SELECT id, direction, body, external_chat_guid, raw, created_at
         FROM conversations
@@ -1038,7 +1060,7 @@ export async function listRecentConversations({ range = 'today', from = '', to =
         ORDER BY created_at DESC
         LIMIT 1
       ) latest ON true
-      ${filter.where}
+      ${where}
       ORDER BY latest.created_at DESC
       LIMIT 50
     `,

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
     <title>FTR Fix Bot</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/assets/styles.css?v=20260907-manager-links" />
+    <link rel="stylesheet" href="/assets/styles.css?v=20260913-chat-filters" />
   </head>
   <body>
     <div class="app-shell">
@@ -76,8 +76,12 @@
           <div class="chat-shell">
             <section class="chat-pane chat-inbox-pane" id="chatInboxPane">
               <div class="chat-section-header">
-                <p class="eyebrow">Messages</p>
-                <strong>Recent chats</strong>
+                <div>
+                  <p class="eyebrow">Messages</p>
+                  <strong id="recentChatTitle">Recent chats</strong>
+                  <small id="recentChatFilterMeta"></small>
+                </div>
+                <button type="button" class="secondary hidden" id="clearChatFilterBtn">All chats</button>
               </div>
               <div class="recent-chat-list" id="recentChatList"></div>
             </section>
@@ -241,6 +245,6 @@
     </div>
     <div class="global-busy hidden" id="globalBusy">Working</div>
     <div class="global-status hidden" id="globalStatus"></div>
-    <script src="/assets/app.js?v=20260907-manager-links"></script>
+    <script src="/assets/app.js?v=20260913-chat-filters"></script>
   </body>
 </html>
